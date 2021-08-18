@@ -19,7 +19,7 @@ getting pricing from CEXes via Hummingbot aggregation
 - End client is confirming the order and sending the execution request to the market maker with a validity time of ... seconds (dependent on average blockchain finality and last look time needed for particular market maker)
 - When the market taker is requesting a price, that no longer available, market maker is able to reject the trade
 - During last look window, the market maker is able to auto hedge client order via Hummingbot 
-- When the trade is confirmed the market maker is sending the trade to the blockchain BY the MARKET MAKER for settlement. 
+- When the trade is confirmed the MARKET MAKER is sending the trade to the blockchain for settlement. 
 - Market maker can also fill the trade with a price that is better than what the client has clicked (positive slippage) 
 - In most cases, all trades should be profitable for the market maker, but it can sometimes take a small loss to decrease rejection ratio statistics for a given front-end 
 
