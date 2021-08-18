@@ -15,7 +15,7 @@ One of the solutions that we see in the long-run, is a split between the low-lat
 
 General Solution Architecture: 
 - Front-end needs to be run and managed by a particular market maker/aggregator of market makers/DAOs (legal disclamers can be taken from: https://liquity.org/)
-- Market maker/price aggregator is streaming a price via WebSocket/https://docs.ethswarm.org/docs/dapps-on-swarm/pss to the end client 
+- Market maker/price aggregator is streaming a price via WebSocket/WebRTC/https://docs.ethswarm.org/docs/dapps-on-swarm/pss to the end client 
 getting pricing from CEXes via Hummingbot aggregation
 - End client is confirming the order and sending the execution request to the market maker with a validity time of ... seconds (dependent on average blockchain finality and last look time needed for particular market maker)
 - When the market taker is requesting a price, that no longer available, market maker is able to reject the trade
@@ -25,5 +25,11 @@ getting pricing from CEXes via Hummingbot aggregation
 - In most cases, all trades should be profitable for the market maker, but it can sometimes take a small loss to decrease rejection ratio statistics for a given front-end 
 
 The general idea of how to do combine on and off-chain workflow for the above solution can be taken of 1inch limit order protocol. To achieve the smallest possible latency between market taker sending execution requests and market maker sending trade to the blockchain for settlement, there is a need for some additional authorization workflow on both ends. To achive decentralization, front-ends should be run IPFS/ethswarm.org style hosting.
+
+Problems to solve:
+- How to measure the performance of the market maker, if the page is run by market maker
+- How front-end should be hosted/managed in the decentralized way
+- How to do marketing (maybe market makers can take over???)
+- How to enable Wallet2Wallet trading using third party feeds (ex. retail client is streaming pricing directly to other retail client via websocket/WebRTC) -> in particular how to prevent DOS style attacts what would flod the system with low quality quotes/quotes that would be always rejected
 
 If you would like to join the project, connect with me via discord: kamilchels#5658
