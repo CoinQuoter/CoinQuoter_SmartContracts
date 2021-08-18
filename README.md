@@ -27,9 +27,14 @@ getting pricing from CEXes via Hummingbot aggregation
 The general idea of how to do combine on and off-chain workflow for the above solution can be taken of 1inch limit order protocol. To achieve the smallest possible latency between market taker sending execution requests and market maker sending trade to the blockchain for settlement, there is a need for some additional authorization workflow on both ends. To achive decentralization, front-ends should be run IPFS/ethswarm.org style hosting.
 
 Problems to solve:
+- How to do marketing of the project (stage 1: get 1-3 market makers that would have a lot of capital on chain and on CEX, stage 2: get retail customers)
 - How to measure the performance of the market maker, if the page is run by market maker
 - How front-end should be hosted/managed in the decentralized way
 - How to do marketing (maybe market makers can take over???)
 - How to enable Wallet2Wallet trading using third party feeds (ex. retail client is streaming pricing directly to other retail client via websocket/WebRTC) -> in particular how to prevent DOS style attacts what would flod the system with low quality quotes/quotes that would be always rejected
+
+Roadmap:
+- Stage 1: bring above to the market
+- Stage 2: create real-time FX SWAP alternative on crypto and enable 20x laverage for on chain trades -> decrease capital usage for market makers (they can then work on margin on CEX and DEX) - > every FX SPOT trade can be combined with FX SWAP -> this woudl give 20x laverage for market makers willing to move liqudity from CEX to DEX
 
 If you would like to join the project, connect with me via discord: kamilchels#5658
