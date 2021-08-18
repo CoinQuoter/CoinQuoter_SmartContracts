@@ -1,5 +1,5 @@
 # LLDEX
-Low Lattency DEX
+Low Latency DEX
 
 This project is done as a Harmony Hacketon project: https://gitcoin.co/hackathon/harmony-defi/projects/9385/low-latency-p2p-dex
 
