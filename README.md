@@ -14,8 +14,8 @@ Taking all the above into account there is a need for a new type of blockchain-b
 One of the solutions that we see in the long-run, is a split between the low-latency price discovery from the blockchain-based settlement. This would bring back the blockchain role to the one it was initially designed for (a double-spending problem for digital currencies described by Satoshi Nakamoto)
 
 General Solution Architecture: 
-- Front-end needs to be run and managed by a particular market maker/aggregator of market makers
-- Market maker/price aggregator is streaming a price via WebSocket to the end client 
+- Front-end needs to be run and managed by a particular market maker/aggregator of market makers/DAOs (legal disclamers can be taken from: https://liquity.org/)
+- Market maker/price aggregator is streaming a price via WebSocket/https://docs.ethswarm.org/docs/dapps-on-swarm/pss to the end client 
 getting pricing from CEXes via Hummingbot aggregation
 - End client is confirming the order and sending the execution request to the market maker with a validity time of ... seconds (dependent on average blockchain finality and last look time needed for particular market maker)
 - When the market taker is requesting a price, that no longer available, market maker is able to reject the trade
@@ -24,6 +24,6 @@ getting pricing from CEXes via Hummingbot aggregation
 - Market maker can also fill the trade with a price that is better than what the client has clicked (positive slippage) 
 - In most cases, all trades should be profitable for the market maker, but it can sometimes take a small loss to decrease rejection ratio statistics for a given front-end 
 
-The general idea of how to do combine on and off-chain workflow for the above solution can be taken of 1inch limit order protocol. To achieve the smallest possible latency between market taker sending execution requests and market maker sending trade to the blockchain for settlement, there is a need for some additional authorization workflow on both ends.
+The general idea of how to do combine on and off-chain workflow for the above solution can be taken of 1inch limit order protocol. To achieve the smallest possible latency between market taker sending execution requests and market maker sending trade to the blockchain for settlement, there is a need for some additional authorization workflow on both ends. To achive decentralization, front-ends should be run IPFS/ethswarm.org style hosting.
 
 If you would like to join the project, connect with me via discord: kamilchels#5658
