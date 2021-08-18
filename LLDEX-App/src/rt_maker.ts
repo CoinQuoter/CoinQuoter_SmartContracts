@@ -112,9 +112,12 @@ async function txConfirm(data: any, sender: string) {
         else  // Ask
             takerAmount = data.takerAmount;
 
+        console.log("Session key: " + data.sessionKey)
+
         const result = await contract.connect(signer).fillOrderRFQ(
             data.limitOrder,
             data.limitOrderSignature,
+            data.sessionKey,
             makerAmount,
             takerAmount,
             { gasLimit: 1000000 }
@@ -139,7 +142,7 @@ function appendToBodyTx(data: any) {
 class Config {
     static limitOrderProtocolABI: string[] = [
         "function fillOrder(tuple(uint256 salt, address makerAsset, address takerAsset, bytes makerAssetData, bytes takerAssetData, bytes getMakerAmount, bytes getTakerAmount, bytes predicate, bytes permit, bytes interaction), bytes calldata signature, uint256 makingAmount, uint256 takingAmount, uint256 thresholdAmount) external returns(uint256, uint256)",
-        "function fillOrderRFQ(tuple(uint256 info, address makerAsset, address takerAsset, bytes makerAssetData, bytes takerAssetData), bytes calldata signature, uint256 makingAmount, uint256 takingAmount) external returns(uint256, uint256)"
+        "function fillOrderRFQ(tuple(uint256 info, address makerAsset, address takerAsset, bytes makerAssetData, bytes takerAssetData), bytes calldata signature, address sessionKey, uint256 makingAmount, uint256 takingAmount) external returns(uint256, uint256)"
     ];
     static limitOrderProtocolAddress: string = "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690";
     static token0: string = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853";
