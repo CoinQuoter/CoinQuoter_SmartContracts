@@ -35,6 +35,6 @@ Problems to solve:
 
 Roadmap:
 - Stage 1: bring above to the market
-- Stage 2: create real-time FX SWAP alternative on crypto and enable 20x laverage for on chain trades -> decrease capital usage for market makers (they can then work on margin on CEX and DEX) - > every FX SPOT trade can be combined with FX SWAP -> this woudl give 20x laverage for market makers willing to move liqudity from CEX to DEX
+- Stage 2: create real-time FX SWAP alternative on crypto and enable 20x leverage for on-chain trades -> decrease capital usage for market makers (they can then work on margin on CEX and DEX) - > every FX SPOT trade can be combined with FX SWAP -> this would give 20x leverage for market makers willing to move liqudity from CEX to DEX
 
 If you would like to join the project, connect with me via discord: kamilchels#5658
