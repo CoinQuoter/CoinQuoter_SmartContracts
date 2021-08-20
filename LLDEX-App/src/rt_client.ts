@@ -24,11 +24,14 @@ const ABIERC20: string[] = [
 ];
 
 const ABILOP: string[] = [
+    "function session(address owner) external view returns(address maker, address sessionKey, uint256 expirationTime, uint256 txCount)",
     "function createOrUpdateSession(address sessionKey, uint256 expirationTime) external returns(int256)",
-    "function sessionExpirationTime(address creator, address sessionKey) external view returns(uint256 expirationTime)",
-    "function sessionValid(address creator, address sessionKey) external view returns(bool valid)",
-    "function endSession(address sessionKey) external",
-    "event OrderFilledRFQ(bytes32 orderHash, uint256 makingAmount)"
+    "function sessionExpirationTime(address owner) external view returns(uint256 expirationTime)",
+    "function endSession() external",
+    "event OrderFilledRFQ(bytes32 orderHash, uint256 makingAmount)",
+    "event SessionTerminated(address indexed sender, address indexed sessionKey)",
+    "event SessionCreated(address indexed creator, address indexed sessionKey, uint256 expirationTime)",
+    "event SessionUpdated(address indexed sender, address indexed sessionKey, uint256 expirationTime)",
 ];
 
 enum TxType {
@@ -89,7 +92,6 @@ $(document).ready(async function () {
 
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
-    provider.pollingInterval = 200;
 
     LOPContract.on("OrderFilledRFQ", (orderHash, makingAmount, event) => {
         console.log("OrderFilledRFQ", orderHash);
@@ -153,10 +155,10 @@ window.addEventListener('DOMContentLoaded', (event) => {
     }
 
     async function sign1InchOrder(type: TxType, data: any) {
-        if (localStorage.getItem('session') == "null")
+        if (localStorage.getItem('session-maker') == "null")
             return;
 
-        const session = JSON.parse(localStorage.getItem('session'));
+        const session = JSON.parse(localStorage.getItem('session-maker'));
         const sessionPrivateKey = session.session_private_key.replaceAll("0x", "");
         const sessionPublicKey = session.session_public_key;
 
@@ -192,8 +194,11 @@ window.addEventListener('DOMContentLoaded', (event) => {
             takerAssetAddres = data.amount1Address;
         }
 
+        var array = new Uint32Array(1);
+        window.crypto.getRandomValues(array);
+
         const limitOrder = limitOrderBuilder.buildRFQOrder({
-            id: (await web3.eth.getTransactionCount(data.takerAddress)) + 1,
+            id: array[0],
             expiresInTimestamp: Math.round(Date.now() / 1000) + 1800,
             makerAssetAddress: makerAssetAddres,
             takerAssetAddress: takerAssetAddres,
@@ -298,12 +303,11 @@ async function updateAccountData() {
 let timeLeftInterval: NodeJS.Timer;
 
 async function updateSessionData() {
-    if (localStorage.getItem('session') == "null") {
+    if (localStorage.getItem('session-maker') == "null") {
         $("#private-key").val("No session");
         $("#current-session-key").text("No session");
         $("#session-exp").text("No session")
         $("#session-time-left").text("No session");
-        $("#generate-session").prop("disabled", false);
         $("#end-session").hide();
 
         clearInterval(timeLeftInterval);
@@ -311,20 +315,20 @@ async function updateSessionData() {
         return;
     }
 
-    const session = JSON.parse(localStorage.getItem('session'));
+    const session = JSON.parse(localStorage.getItem('session-maker'));
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
     const signer = provider.getSigner(0)
     const signerAddress = await signer.getAddress();
 
-    const isValid = await LOPContract.connect(signer).sessionValid(signerAddress, session.session_public_key);
-    const expirationTime = await LOPContract.connect(signer).sessionExpirationTime(signerAddress, session.session_public_key);
+    const expirationTime = await LOPContract.connect(signer).sessionExpirationTime(signerAddress);
     const expirationDate = new Date(Number(expirationTime.toString()) * 1000)
+    const dateNow = new Date().getTime() / 1000;
 
-    console.log(isValid);
+    clearInterval(timeLeftInterval);
+    updateTxButtons();
 
-    if (isValid) {
-        $("#generate-session").prop("disabled", true);
+    if (expirationTime > dateNow) {
         $("#end-session").show();
         $("#private-key").val(session.session_private_key);
         $("#current-session-key").text(session.session_public_key);
@@ -341,17 +345,21 @@ async function updateSessionData() {
 
             $("#session-time-left").text(days + "d " + hours + "h " + minutes + "m " + seconds + "s ");
 
+            if (distance / 1000 < 60) {
+                $("#bid-button").prop("disabled", true);
+                $("#ask-button").prop("disabled", true);
+            }
+
             if (distance < 0) {
                 clearInterval(timeLeftInterval);
-                localStorage.setItem('session', null);
+                localStorage.setItem('session-maker', null);
 
                 $("#end-session").hide();
-                $("#generate-session").prop("disabled", false);
                 $("#session-time-left").text("Session expired");
             }
         }, 1000);
     } else {
-        localStorage.setItem('session', null);
+        localStorage.setItem('session-maker', null);
     }
 }
 
@@ -361,19 +369,17 @@ async function createSession() {
         const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
         const signer = provider.getSigner(0)
         const wallet = ethers.Wallet.createRandom()
-        const expirationTime = (await provider.getBlock(await provider.getBlockNumber())).timestamp + 120;
+        const expirationTime = Math.round(Date.now() / 1000) + 120;
         // Session expires in 2 minutes
 
-        //const expirationTime = Math.round(Date.now() / 1000) + 120;
+        const result = await LOPContract.connect(signer).createOrUpdateSession(wallet.address, expirationTime);
+        await provider.waitForTransaction(result.hash);
 
-        localStorage.setItem('session', JSON.stringify({
+        localStorage.setItem('session-maker', JSON.stringify({
             session_private_key: wallet.privateKey,
             session_public_key: wallet.address,
             session_creator: await signer.getAddress()
         }));
-
-        const result = await LOPContract.connect(signer).createOrUpdateSession(wallet.address, expirationTime);
-        await provider.waitForTransaction(result.hash);
 
         updateSessionData();
     } catch (err) {
@@ -383,18 +389,18 @@ async function createSession() {
 
 async function endSession() {
     try {
-        const sessionKey = JSON.parse(localStorage.getItem('session')).session_public_key;
         const provider = new ethers.providers.Web3Provider(window.ethereum)
         const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
         const signer = provider.getSigner(0)
 
-        const result = await LOPContract.connect(signer).endSession(sessionKey);
+        const result = await LOPContract.connect(signer).endSession();
         await provider.waitForTransaction(result.hash);
-        localStorage.setItem('session', null);
+        localStorage.setItem('session-maker', null);
 
         updateSessionData();
     } catch (err) {
-
+        console.error(err);
+        updateSessionData();
     }
 }
 

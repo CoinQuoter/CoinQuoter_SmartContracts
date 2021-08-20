@@ -45,14 +45,11 @@ contract LimitOrderProtocol is
     // Maker Nonce:
     //   predicate := this.nonceEquals(makerAddress, makerNonce)
 
-    modifier sessionNotExpired(OrderRFQ memory order, address sessionKey) {
+    modifier sessionNotExpired(OrderRFQ memory order) {
         address maker = order.makerAssetData.decodeAddress(_FROM_INDEX);
 
-        require(maker == _sessions[maker][sessionKey].maker, "LOP: NM");
-        require(
-            block.timestamp <= _sessions[maker][sessionKey].expirationTime,
-            "LOP: EXP"
-        );
+        // require(maker == _sessions[maker].maker, "LOP: NM");
+        require(block.timestamp <= _sessions[maker].expirationTime, "LOP: EXP");
         _;
     }
 
@@ -105,7 +102,7 @@ contract LimitOrderProtocol is
 
     mapping(bytes32 => uint256) private _remaining;
     mapping(address => mapping(uint256 => uint256)) private _invalidator;
-    mapping(address => mapping(address => Session)) private _sessions;
+    mapping(address => Session) private _sessions;
 
     // solhint-disable-next-line func-name-mixedcase
     function DOMAIN_SEPARATOR() external view returns (bytes32) {
@@ -205,46 +202,43 @@ contract LimitOrderProtocol is
     function fillOrderRFQ(
         OrderRFQ memory order,
         bytes calldata signature,
-        address sessionKey,
         uint256 makingAmount,
         uint256 takingAmount
-    ) external sessionNotExpired(order, sessionKey) returns (uint256, uint256) {
+    ) external sessionNotExpired(order) returns (uint256, uint256) {
         return
             fillOrderRFQTo(
                 order,
                 signature,
                 makingAmount,
                 takingAmount,
-                sessionKey,
                 msg.sender
             );
     }
 
-    // function fillOrderRFQToWithPermit(
-    //     OrderRFQ memory order,
-    //     bytes calldata signature,
-    //     uint256 makingAmount,
-    //     uint256 takingAmount,
-    //     address target,
-    //     bytes calldata permit
-    // ) external returns (uint256, uint256) {
-    //     _permit(permit);
-    //     return
-    //         fillOrderRFQTo(
-    //             order,
-    //             signature,
-    //             makingAmount,
-    //             takingAmount,
-    //             target
-    //         );
-    // }
+    function fillOrderRFQToWithPermit(
+        OrderRFQ memory order,
+        bytes calldata signature,
+        uint256 makingAmount,
+        uint256 takingAmount,
+        address target,
+        bytes calldata permit
+    ) external returns (uint256, uint256) {
+        _permit(permit);
+        return
+            fillOrderRFQTo(
+                order,
+                signature,
+                makingAmount,
+                takingAmount,
+                target
+            );
+    }
 
     function fillOrderRFQTo(
         OrderRFQ memory order,
         bytes calldata signature,
         uint256 makingAmount,
         uint256 takingAmount,
-        address sessionKey,
         address target
     ) public returns (uint256, uint256) {
         // Check time expiration
@@ -305,8 +299,7 @@ contract LimitOrderProtocol is
             order.makerAssetData,
             order.takerAssetData,
             signature,
-            orderHash,
-            sessionKey
+            orderHash
         );
 
         // Maker => Taker, Taker => Maker
@@ -395,8 +388,7 @@ contract LimitOrderProtocol is
                         order.makerAssetData,
                         order.takerAssetData,
                         signature,
-                        orderHash,
-                        address(0)
+                        orderHash
                     );
                     remainingMakerAmount = order.makerAssetData.decodeUint256(
                         _AMOUNT_INDEX
@@ -493,44 +485,76 @@ contract LimitOrderProtocol is
         _validateSessionKey(sessionKey);
         require(expirationTime > block.timestamp, "LOP: EXP");
 
-        _sessions[msg.sender][sessionKey] = Session({
-            maker: address(msg.sender),
-            sessionKey: sessionKey,
-            expirationTime: expirationTime,
-            txCount: 0
-        });
+        if (_sessions[msg.sender].sessionKey != address(0)) {
+            _sessions[msg.sender].expirationTime = expirationTime;
+            if (_sessions[msg.sender].sessionKey != sessionKey) {
+                _sessions[msg.sender].sessionKey = sessionKey;
+            }
+
+            emit SessionUpdated(
+                msg.sender,
+                _sessions[msg.sender].sessionKey,
+                expirationTime
+            );
+
+            return 1;
+        } else {
+            _sessions[msg.sender] = Session({
+                maker: address(msg.sender),
+                sessionKey: sessionKey,
+                expirationTime: expirationTime,
+                txCount: 0
+            });
+
+            emit SessionCreated(
+                msg.sender,
+                _sessions[msg.sender].sessionKey,
+                expirationTime
+            );
+        }
 
         return 0;
     }
 
-    function endSession(address sessionKey) external override nonReentrant {
-        _validateSessionKey(sessionKey);
+    function endSession() external override nonReentrant {
+        _validateSessionKey(_sessions[msg.sender].sessionKey);
+        require(_sessions[msg.sender].expirationTime != 0, "LOP: IS");
         require(
-            _sessions[msg.sender][sessionKey].maker == msg.sender,
-            "LOP: SNM"
+            _sessions[msg.sender].expirationTime >= block.timestamp,
+            "LOP: ES"
         );
 
-        delete _sessions[msg.sender][sessionKey];
+        _sessions[msg.sender].expirationTime = 0;
+
+        emit SessionTerminated(msg.sender, _sessions[msg.sender].sessionKey);
     }
 
-    function sessionExpirationTime(address creator, address sessionKey)
+    function sessionExpirationTime(address owner)
         external
         view
         override
         returns (uint256 expirationTime)
     {
-        return _sessions[creator][sessionKey].expirationTime;
+        return _sessions[owner].expirationTime;
     }
 
-    function sessionValid(address creator, address sessionKey)
+    function session(address owner)
         external
         view
         override
-        returns (bool valid)
+        returns (
+            address maker,
+            address sessionKey,
+            uint256 expirationTime,
+            uint256 txCount
+        )
     {
-        return
-            _sessions[creator][sessionKey].sessionKey != address(0) &&
-            _sessions[creator][sessionKey].expirationTime >= block.timestamp;
+        return (
+            _sessions[owner].maker,
+            _sessions[owner].sessionKey,
+            _sessions[owner].expirationTime,
+            _sessions[owner].txCount
+        );
     }
 
     function _permit(bytes memory permitData) private {
@@ -591,8 +615,7 @@ contract LimitOrderProtocol is
         bytes memory makerAssetData,
         bytes memory takerAssetData,
         bytes memory signature,
-        bytes32 orderHash,
-        address sessionKey
+        bytes32 orderHash
     ) private view {
         require(makerAssetData.length >= 100, "LOP: bad makerAssetData.length");
         require(takerAssetData.length >= 100, "LOP: bad takerAssetData.length");
@@ -609,8 +632,9 @@ contract LimitOrderProtocol is
             "LOP: bad takerAssetData.selector"
         );
 
-        //address maker = address(makerAssetData.decodeAddress(_FROM_INDEX));
-        address maker = sessionKey;
+        address maker = _sessions[
+            address(makerAssetData.decodeAddress(_FROM_INDEX))
+        ].sessionKey;
         if (
             (signature.length != 65 && signature.length != 64) ||
             SilentECDSA.recover(orderHash, signature) != maker

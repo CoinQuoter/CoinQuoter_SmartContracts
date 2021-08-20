@@ -27,6 +27,13 @@ interface ITradingSession {
         uint256 expirationTime
     );
 
+    /**
+     * @notice Emitted on successful session creation
+     * @param sender address of account updating session
+     * @param sessionKey public key of session
+     */
+    event SessionTerminated(address indexed sender, address indexed sessionKey);
+
     // details about the taker - maker session
     struct Session {
         // Address of maker
@@ -43,15 +50,20 @@ interface ITradingSession {
         external
         returns (int256);
 
-    function endSession(address sessionKey) external;
+    function endSession() external;
 
-    function sessionExpirationTime(address creator, address sessionKey)
+    function sessionExpirationTime(address owner)
         external
         view
         returns (uint256 expirationTime);
 
-    function sessionValid(address creator, address sessionKey)
+    function session(address owner)
         external
         view
-        returns (bool valid);
+        returns (
+            address maker,
+            address sessionKey,
+            uint256 expirationTime,
+            uint256 txCount
+        );
 }
