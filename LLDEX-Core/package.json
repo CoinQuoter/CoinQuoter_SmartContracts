@@ -1,0 +1,25 @@
+{
+  "name": "lldex_core",
+  "version": "1.0.0",
+  "description": "lldex contracts",
+  "main": "index.js",
+  "author": "",
+  "license": "ISC",
+  "files": [
+    "contracts/helpers",
+    "contracts/libraries",
+    "contracts/interfaces",
+    "contracts/mocks",
+    "contracts/LimitOrderProtocol.sol",
+    "artifacts/contracts/Limit-order-protocol/**/*.json",
+    "!artifacts/contracts/Limit-order-protocol/**/*.dbg.json"
+  ],
+  "dependencies": {
+    "@openzeppelin/contracts_v42": "npm:@openzeppelin/contracts@^4.2.0",
+    "hardhat": "^2.6.0"
+  },
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test"
+  }
+}
