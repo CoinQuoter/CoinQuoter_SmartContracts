@@ -2,13 +2,12 @@
 
 pragma solidity ^0.8.0;
 
-
 interface InteractiveMaker {
     function notifyFillOrder(
-        address makerAsset,
         address takerAsset,
-        uint256 makingAmount,
+        address makerAsset,
         uint256 takingAmount,
+        uint256 makingAmount,
         bytes memory interactiveData
     ) external;
 }

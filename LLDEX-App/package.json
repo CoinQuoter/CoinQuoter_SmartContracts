@@ -28,13 +28,14 @@
     "ethers": "^5.4.4",
     "https-browserify": "^1.0.0",
     "jquery": "^3.6.0",
-    "keccak": "^3.0.1",
+    "keccak": "^3.0.2",
+    "limit-order-protocol-lldex": "file:../limit-order-protocol-utils/dist",
     "lodash": "^4.17.21",
     "madge": "^5.0.1",
     "os-browserify": "^0.3.0",
     "pubnub": "^4.32.1",
     "readable-stream": "^3.6.0",
     "stream-http": "^3.2.0",
-    "web3": "^1.5.1"
+    "web3": "^2.0.0-alpha.1"
   }
 }

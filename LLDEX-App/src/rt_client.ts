@@ -1,4 +1,4 @@
-import { LimitOrderBuilder, LimitOrderPredicateBuilder, LimitOrderPredicateCallData, LimitOrderProtocolFacade, PrivateKeyProviderConnector } from "@1inch/limit-order-protocol";
+import { LimitOrderBuilder, LimitOrderPredicateBuilder, LimitOrderPredicateCallData, LimitOrderProtocolFacade, PrivateKeyProviderConnector } from "limit-order-protocol-lldex";
 import * as PubNub from "pubnub";
 import Web3 from "web3"
 import Decimal from 'decimal.js';
@@ -7,7 +7,7 @@ import { ethers } from "ethers";
 
 let allowanceFetched = false;
 
-let takerLastPacket: any;
+let makerLastPacket: any;
 
 const lopAddress = "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690";
 const uuid_client = PubNub.generateUUID();
@@ -24,11 +24,11 @@ const ABIERC20: string[] = [
 ];
 
 const ABILOP: string[] = [
-    "function session(address owner) external view returns(address maker, address sessionKey, uint256 expirationTime, uint256 txCount)",
+    "function session(address owner) external view returns(address taker, address sessionKey, uint256 expirationTime, uint256 txCount)",
     "function createOrUpdateSession(address sessionKey, uint256 expirationTime) external returns(int256)",
     "function sessionExpirationTime(address owner) external view returns(uint256 expirationTime)",
     "function endSession() external",
-    "event OrderFilledRFQ(bytes32 orderHash, uint256 makingAmount)",
+    "event OrderFilledRFQ(bytes32 orderHash, uint256 takingAmount)",
     "event SessionTerminated(address indexed sender, address indexed sessionKey)",
     "event SessionCreated(address indexed creator, address indexed sessionKey, uint256 expirationTime)",
     "event SessionUpdated(address indexed sender, address indexed sessionKey, uint256 expirationTime)",
@@ -67,7 +67,7 @@ $(document).ready(async function () {
         const token0Contract = new ethers.Contract($("#token-sell").data("token"), ABIERC20, provider)
 
         const newAllowance = new Decimal($("#amount-in-approved").val().toString()).mul(new Decimal(10).pow($("#token-sell").data("tokenDecimals")))
-        await token0Contract.connect(provider.getSigner(0)).approve(takerLastPacket.contractAddress, newAllowance.toFixed())
+        await token0Contract.connect(provider.getSigner(0)).approve(makerLastPacket.contractAddress, newAllowance.toFixed())
     });
 
     if ($("#token-sell").prop('selectedIndex') == 0) {
@@ -93,14 +93,14 @@ $(document).ready(async function () {
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
 
-    LOPContract.on("OrderFilledRFQ", (orderHash, makingAmount, event) => {
+    LOPContract.on("OrderFilledRFQ", (orderHash, takingAmount, event) => {
         console.log("OrderFilledRFQ", orderHash);
 
-        if (!takerLastPacket)
+        if (!makerLastPacket)
             return;
 
         allowanceFetched = false;
-        updateAllowance(takerLastPacket);
+        updateAllowance(makerLastPacket);
 
     });
 
@@ -116,11 +116,11 @@ window.addEventListener('DOMContentLoaded', (event) => {
     const amountOutput = <HTMLInputElement>document.getElementById('amount-out');
 
     bidButton.addEventListener('click', async () => {
-        publishMessageToTaker(TxType.Bid);
+        publishMessageTomaker(TxType.Bid);
     })
 
     askButton.addEventListener('click', async () => {
-        publishMessageToTaker(TxType.Ask);
+        publishMessageTomaker(TxType.Ask);
     })
 
 
@@ -134,10 +134,17 @@ window.addEventListener('DOMContentLoaded', (event) => {
             const evtData = event.message.content;
 
             if (evtData.type == "stream_depth") {
-                takerLastPacket = evtData.data;
+                makerLastPacket = evtData.data;
 
                 updateAllowance(evtData.data);
                 updateButtons(evtData.data);
+                updateOutputValue(evtData.data);
+            } else if (evtData.type == "transaction_posted") {
+                $('#tx-status').append(`<p style=\"color:blue\"> [${evtData.data.hash}] RFQ Order posted on blockchain</p>`)
+            } else if (evtData.type == "transaction_filled") {
+                $('#tx-status').append(`<p style=\"color:green\"> [${evtData.data.hash}] RFQ Order filled successfully</p>`)
+            } else if (evtData.type == "transaction_failed") {
+                $('#tx-status').append(`<p style=\"color:red\"> [${evtData.data.hash}] Filling RFQ Order failed</p>`)
             }
         },
         presence: function (event) {
@@ -147,6 +154,14 @@ window.addEventListener('DOMContentLoaded', (event) => {
         }
     });
 
+    function updateOutputValue(data: any) {
+        if ($("#bid-button").prop("disabled")) {
+            amountOutput.value = (Number(amountInput.value) * (1 / Number(data.ask))).toString();
+        } else {
+            amountOutput.value = (Number(amountInput.value) * Number(data.bid)).toString();
+        }
+    }
+
     function updateButtons(data: any) {
         bidButton.value = "BID:" + data.bid;
         askButton.value = "ASK:" + data.ask;
@@ -155,10 +170,10 @@ window.addEventListener('DOMContentLoaded', (event) => {
     }
 
     async function sign1InchOrder(type: TxType, data: any) {
-        if (localStorage.getItem('session-maker') == "null")
+        if (localStorage.getItem('session-taker') == "null")
             return;
 
-        const session = JSON.parse(localStorage.getItem('session-maker'));
+        const session = JSON.parse(localStorage.getItem('session-taker'));
         const sessionPrivateKey = session.session_private_key.replaceAll("0x", "");
         const sessionPublicKey = session.session_public_key;
 
@@ -169,29 +184,29 @@ window.addEventListener('DOMContentLoaded', (event) => {
 
         let limitOrderBuilder: LimitOrderBuilder = new LimitOrderBuilder(
             data.contractAddress,
-            await web3.eth.getChainId(),
+            31337,
             providerConnector
         );
 
         let amountIn;
         let amountOut;
-        let makerAssetAddres;
         let takerAssetAddres;
+        let makerAssetAddres;
 
         if (type == TxType.Ask) {
             amountOutput.value = (Number(amountInput.value) * (1 / Number(data.ask))).toString();
 
             amountIn = new Decimal(amountInput.value).mul(new Decimal(10).pow(data.amount0Dec)).toFixed();
             amountOut = new Decimal(amountOutput.value).mul(new Decimal(10).pow(data.amount1Dec)).toFixed();
-            makerAssetAddres = data.amount1Address;
-            takerAssetAddres = data.amount0Address;
+            takerAssetAddres = data.amount1Address;
+            makerAssetAddres = data.amount0Address;
         } else {
             amountOutput.value = (Number(amountInput.value) * Number(data.bid)).toString();
 
             amountIn = new Decimal(amountInput.value).mul(new Decimal(10).pow(data.amount0Dec)).toFixed();
             amountOut = new Decimal(amountOutput.value).mul(new Decimal(10).pow(data.amount1Dec)).toFixed();
-            makerAssetAddres = data.amount0Address;
-            takerAssetAddres = data.amount1Address;
+            takerAssetAddres = data.amount0Address;
+            makerAssetAddres = data.amount1Address;
         }
 
         var array = new Uint32Array(1);
@@ -200,12 +215,12 @@ window.addEventListener('DOMContentLoaded', (event) => {
         const limitOrder = limitOrderBuilder.buildRFQOrder({
             id: array[0],
             expiresInTimestamp: Math.round(Date.now() / 1000) + 1800,
-            makerAssetAddress: makerAssetAddres,
             takerAssetAddress: takerAssetAddres,
-            makerAddress: walletAddress,
-            takerAddress: data.takerAddress,
-            makerAmount: amountIn,
-            takerAmount: amountOut
+            makerAssetAddress: makerAssetAddres,
+            takerAddress: walletAddress,
+            makerAddress: data.makerAddress,
+            takerAmount: amountIn,
+            makerAmount: amountOut
         });
 
         const resultEIP712 = limitOrderBuilder.buildRFQOrderTypedData(limitOrder);
@@ -216,15 +231,15 @@ window.addEventListener('DOMContentLoaded', (event) => {
         );
 
         return {
-            makerAmount: amountIn,
-            takerAmonut: amountOut,
+            takerAmount: amountIn,
+            makerAmonut: amountOut,
             limitOrderSignature: limitOrderSignature,
             limitOrder: limitOrder,
             sessionKey: sessionPublicKey
         };
     }
 
-    async function publishMessageToTaker(type: TxType) {
+    async function publishMessageTomaker(type: TxType) {
         const oneInchOrder = await sign1InchOrder(type, JSON.parse(bidButton.dataset.data));
         if (!oneInchOrder)
             return;
@@ -238,8 +253,8 @@ window.addEventListener('DOMContentLoaded', (event) => {
                     data: {
                         type: type,
                         price: bidButton.dataset.price,
-                        makerAmount: oneInchOrder.makerAmount,
-                        takerAmount: oneInchOrder.takerAmonut,
+                        takerAmount: oneInchOrder.takerAmount,
+                        makerAmount: oneInchOrder.makerAmonut,
                         limitOrderSignature: oneInchOrder.limitOrderSignature,
                         limitOrder: oneInchOrder.limitOrder,
                         sessionKey: oneInchOrder.sessionKey,
@@ -252,8 +267,8 @@ window.addEventListener('DOMContentLoaded', (event) => {
 });
 
 async function updateAllowance(data: any) {
-    $("#token-sell").data("token", $("#token-sell").prop('selectedIndex') == 0 ? takerLastPacket.amount0Address : takerLastPacket.amount1Address)
-    $("#token-sell").data("tokenDecimals", $("#token-sell").prop('selectedIndex') == 0 ? takerLastPacket.amount0Dec : takerLastPacket.amount1Dec)
+    $("#token-sell").data("token", $("#token-sell").prop('selectedIndex') == 0 ? makerLastPacket.amount0Address : makerLastPacket.amount1Address)
+    $("#token-sell").data("tokenDecimals", $("#token-sell").prop('selectedIndex') == 0 ? makerLastPacket.amount0Dec : makerLastPacket.amount1Dec)
 
     if (allowanceFetched)
         return;
@@ -261,16 +276,16 @@ async function updateAllowance(data: any) {
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     const tokenContract = new ethers.Contract($("#token-sell").data("token"), ABIERC20, provider);
 
-    const makerAddress = await provider.getSigner(0).getAddress();
+    const takerAddress = await provider.getSigner(0).getAddress();
     const limitOrderProtocolAddress = data.contractAddress;
 
-    if (makerAddress != limitOrderProtocolAddress) {
-        const allowanceToken = new Decimal((await tokenContract.connect(makerAddress).allowance(makerAddress, limitOrderProtocolAddress)).toString()).div(new Decimal(10).pow(data.amount0Dec));
+    if (takerAddress != limitOrderProtocolAddress) {
+        const allowanceToken = new Decimal((await tokenContract.connect(takerAddress).allowance(takerAddress, limitOrderProtocolAddress)).toString()).div(new Decimal(10).pow(data.amount0Dec));
         $("#amount-in-approved").val(allowanceToken.toFixed(8));
 
         allowanceFetched = true;
     } else {
-        console.log("Maker and Limit-Order-Protocol address is the same");
+        console.log("taker and Limit-Order-Protocol address is the same");
     }
 }
 
@@ -303,7 +318,7 @@ async function updateAccountData() {
 let timeLeftInterval: NodeJS.Timer;
 
 async function updateSessionData() {
-    if (localStorage.getItem('session-maker') == "null") {
+    if (localStorage.getItem('session-taker') == "null") {
         $("#private-key").val("No session");
         $("#current-session-key").text("No session");
         $("#session-exp").text("No session")
@@ -315,7 +330,7 @@ async function updateSessionData() {
         return;
     }
 
-    const session = JSON.parse(localStorage.getItem('session-maker'));
+    const session = JSON.parse(localStorage.getItem('session-taker'));
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
     const signer = provider.getSigner(0)
@@ -352,14 +367,14 @@ async function updateSessionData() {
 
             if (distance < 0) {
                 clearInterval(timeLeftInterval);
-                localStorage.setItem('session-maker', null);
+                localStorage.setItem('session-taker', null);
 
                 $("#end-session").hide();
                 $("#session-time-left").text("Session expired");
             }
         }, 1000);
     } else {
-        localStorage.setItem('session-maker', null);
+        localStorage.setItem('session-taker', null);
     }
 }
 
@@ -369,13 +384,13 @@ async function createSession() {
         const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
         const signer = provider.getSigner(0)
         const wallet = ethers.Wallet.createRandom()
-        const expirationTime = Math.round(Date.now() / 1000) + 120;
+        const expirationTime = Math.round(Date.now() / 1000) + 1800;
         // Session expires in 2 minutes
 
         const result = await LOPContract.connect(signer).createOrUpdateSession(wallet.address, expirationTime);
         await provider.waitForTransaction(result.hash);
 
-        localStorage.setItem('session-maker', JSON.stringify({
+        localStorage.setItem('session-taker', JSON.stringify({
             session_private_key: wallet.privateKey,
             session_public_key: wallet.address,
             session_creator: await signer.getAddress()
@@ -395,7 +410,7 @@ async function endSession() {
 
         const result = await LOPContract.connect(signer).endSession();
         await provider.waitForTransaction(result.hash);
-        localStorage.setItem('session-maker', null);
+        localStorage.setItem('session-taker', null);
 
         updateSessionData();
     } catch (err) {

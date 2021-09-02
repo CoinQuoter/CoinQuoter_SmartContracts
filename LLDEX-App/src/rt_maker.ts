@@ -6,7 +6,7 @@ import Web3 from "web3";
 import * as $ from "jquery";
 
 // Hardhat default accounts (1) private key
-const takerPrivateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+//const makerPrivateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 var streamingPrices: boolean = false;
 
 declare global {
@@ -73,7 +73,7 @@ conn.onmessage = async function (evt) {
         ask: ask,
         bidAmount: bigNumberBid.toString(),
         askAmount: bigNumberAsk.toString(),
-        takerAddress: address,
+        makerAddress: address,
         amount0Address: Config.token0,
         amount1Address: Config.token1,
         amount0Dec: Config.token0Dec,
@@ -111,37 +111,45 @@ async function txConfirm(data: any, sender: string) {
         return;
 
     if (!$("#auto-accept").is(':checked')) {
-        const confirmation = window.confirm(`Incoming RFQ fill order from ${sender}.\nType: ${data.type == 1 ? "BID" : "ASK"}\nMaker amount: ${data.makerAmount}\nTaker amount: ${data.takerAmount}`);
+        const confirmation = window.confirm(`Incoming RFQ fill order from ${sender}.\nType: ${data.type == 1 ? "BID" : "ASK"}\ntaker amount: ${data.takerAmount}\nmaker amount: ${data.makerAmount}`);
         if (!confirmation)
             return;
     }
 
+    if (localStorage.getItem('session-maker') == null)
+        return;
+
+    const session = JSON.parse(localStorage.getItem('session-maker'));
+
     const provider = new ethers.providers.Web3Provider(window.ethereum)
-    const signer = new ethers.Wallet(takerPrivateKey, provider);
+    const signer = new ethers.Wallet(session.session_private_key, provider);
     const contract: Contract = new ethers.Contract(
         Config.limitOrderProtocolAddress,
         Config.limitOrderProtocolABI,
         provider
     );
 
-    let makerAmount = "0"
     let takerAmount = "0"
+    let makerAmount = "0"
 
     // Bid
     if (data.type == 1)
-        makerAmount = data.makerAmount;
-    else  // Ask
         takerAmount = data.takerAmount;
+    else  // Ask
+        makerAmount = data.makerAmount;
 
-    console.log("Session key: " + data.sessionKey)
     try {
         const result = await contract.connect(signer).fillOrderRFQ(
             data.limitOrder,
             data.limitOrderSignature,
-            makerAmount,
             takerAmount,
+            makerAmount,
             { gasLimit: 1000000 }
         );
+
+        publishMessage("eth-usdt-tx", "transaction_posted", {
+            hash: result.hash
+        });
 
         appendTransactionToList(data, result.hash);
 
@@ -158,11 +166,36 @@ async function txConfirm(data: any, sender: string) {
 
 async function txSuccess(hash: String) {
     $(`#${hash}`).append("<p style=\"color:green\">RFQ Order filled successfully</p>")
+
+    publishMessage("eth-usdt-tx", "transaction_filled", {
+        hash: hash
+    });
 }
 
 async function txFail(hash: String) {
     $(`#${hash}`).append("<p style=\"color:red\">Filling RFQ Order failed</p>")
+
+    publishMessage("eth-usdt-tx", "transaction_failed", {
+        hash: hash
+    });
 }
+
+function publishMessage(channel: string, type: string, data: any) {
+    pubnub.publish({
+        channel: channel,
+        message: {
+            content: {
+                type: type,
+                data: data
+            },
+            sender: uuid
+        },
+        meta: {
+            uuid: pubnub.getUUID()
+        }
+    });
+}
+
 
 function appendTransactionToList(data: any, hash: string) {
     let pElement = document.createElement('p');
@@ -170,8 +203,8 @@ function appendTransactionToList(data: any, hash: string) {
     pElement.appendChild(document.createTextNode(JSON.stringify({
         signature: data.limitOrderSignature,
         ...data.limitOrder,
-        takerAmount: data.takerAmount,
         makerAmount: data.makerAmount,
+        takerAmount: data.takerAmount,
         type: data.type
     }, null, 4)));
 
@@ -270,9 +303,9 @@ async function updateAllowance() {
     const tokenContract0 = new ethers.Contract(Config.token0, Config.ERC20ABI, provider);
     const tokenContract1 = new ethers.Contract(Config.token1, Config.ERC20ABI, provider);
 
-    const makerAddress = await provider.getSigner(0).getAddress();
-    const allowanceToken0 = new Decimal((await tokenContract0.connect(makerAddress).allowance(makerAddress, Config.limitOrderProtocolAddress)).toString()).div(new Decimal(10).pow(Config.token0Dec));
-    const allowanceToken1 = new Decimal((await tokenContract1.connect(makerAddress).allowance(makerAddress, Config.limitOrderProtocolAddress)).toString()).div(new Decimal(10).pow(Config.token1Dec));
+    const takerAddress = await provider.getSigner(0).getAddress();
+    const allowanceToken0 = new Decimal((await tokenContract0.connect(takerAddress).allowance(takerAddress, Config.limitOrderProtocolAddress)).toString()).div(new Decimal(10).pow(Config.token0Dec));
+    const allowanceToken1 = new Decimal((await tokenContract1.connect(takerAddress).allowance(takerAddress, Config.limitOrderProtocolAddress)).toString()).div(new Decimal(10).pow(Config.token1Dec));
 
     $("#amount-token0-approved").val(allowanceToken0.toFixed(8));
     $("#amount-token1-approved").val(allowanceToken1.toFixed(8));
@@ -298,7 +331,7 @@ async function generateKeyset(privateKey?: string) {
     const signer = provider.getSigner(0)
     const wallet = ethers.Wallet.createRandom()
 
-    localStorage.setItem('session-taker', JSON.stringify({
+    localStorage.setItem('session-maker', JSON.stringify({
         session_private_key: privateKey ? privateKey : wallet.privateKey,
         session_creator: await signer.getAddress()
     }));
@@ -331,12 +364,19 @@ async function createSession() {
             return;
         }
 
+        if (localStorage.getItem('session-maker') == null)
+            return;
+
+        const session = JSON.parse(localStorage.getItem('session-maker'));
+
         const signer = provider.getSigner(0)
-        const wallet = ethers.Wallet.createRandom()
-        // Session expires in 2 minutes
         const expirationTime = Math.round(Date.now() / 1000) + sessionLength;
 
-        const result = await LOPContract.connect(signer).createOrUpdateSession(wallet.address, expirationTime);
+        const result = await LOPContract.connect(signer)
+            .createOrUpdateSession(
+                await privateKeyToPublic(session.session_private_key),
+                expirationTime
+            );
         await provider.waitForTransaction(result.hash);
 
         updateSessionData();
@@ -348,10 +388,10 @@ async function createSession() {
 async function updateAccountData() {
     const provider = new ethers.providers.Web3Provider(window.ethereum)
 
-    console.log("ABCD: " + localStorage.getItem('session-taker') != null);
+    console.log("ABCD: " + localStorage.getItem('session-maker') != null);
 
-    if (localStorage.getItem('session-taker') != null) {
-        const session = JSON.parse(localStorage.getItem('session-taker'));
+    if (localStorage.getItem('session-maker') != null) {
+        const session = JSON.parse(localStorage.getItem('session-maker'));
 
         $("#current-session-key").val(await privateKeyToPublic(session.session_private_key));
         $("#sender-session-private-key-input").val(session.session_private_key);
@@ -385,8 +425,8 @@ async function updateAccountData() {
 }
 
 async function updateETHBalance() {
-    if (localStorage.getItem('session-taker') != "null") {
-        const session = JSON.parse(localStorage.getItem('session-taker'));
+    if (localStorage.getItem('session-maker') != "null") {
+        const session = JSON.parse(localStorage.getItem('session-maker'));
         const provider = new ethers.providers.Web3Provider(window.ethereum)
         const sessionBalance = await provider.getBalance(await privateKeyToPublic(session.session_private_key));
         $("#sender-session-balance").text(ethers.utils.formatEther(sessionBalance) + " ETH");
@@ -424,13 +464,13 @@ function clearSessionData() {
 }
 
 async function updateSessionData() {
-    if (localStorage.getItem('session-taker') == "null") {
+    if (localStorage.getItem('session-maker') == "null") {
         clearSessionData();
 
         return;
     }
 
-    const session = JSON.parse(localStorage.getItem('session-taker'));
+    const session = JSON.parse(localStorage.getItem('session-maker'));
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     const LOPContract = new ethers.Contract(Config.limitOrderProtocolAddress, Config.limitOrderProtocolABI, provider)
     const signer = provider.getSigner(0)
@@ -475,9 +515,9 @@ async function updateSessionData() {
 
 class Config {
     static limitOrderProtocolABI: string[] = [
-        "function fillOrder(tuple(uint256 salt, address makerAsset, address takerAsset, bytes makerAssetData, bytes takerAssetData, bytes getMakerAmount, bytes getTakerAmount, bytes predicate, bytes permit, bytes interaction), bytes calldata signature, uint256 makingAmount, uint256 takingAmount, uint256 thresholdAmount) external returns(uint256, uint256)",
-        "function fillOrderRFQ(tuple(uint256 info, address makerAsset, address takerAsset, bytes makerAssetData, bytes takerAssetData), bytes calldata signature, uint256 makingAmount, uint256 takingAmount) external returns(uint256, uint256)",
-        "function session(address owner) external view returns(address maker, address sessionKey, uint256 expirationTime, uint256 txCount)",
+        "function fillOrder(tuple(uint256 salt, address takerAsset, address makerAsset, bytes takerAssetData, bytes makerAssetData, bytes getTakerAmount, bytes getMakerAmount, bytes predicate, bytes permit, bytes interaction), bytes calldata signature, uint256 takingAmount, uint256 makingAmount, uint256 thresholdAmount) external returns(uint256, uint256)",
+        "function fillOrderRFQ(tuple(uint256 info, address takerAsset, address makerAsset, bytes takerAssetData, bytes makerAssetData), bytes calldata signature, uint256 takingAmount, uint256 makingAmount) external returns(uint256, uint256)",
+        "function session(address owner) external view returns(address taker, address sessionKey, uint256 expirationTime, uint256 txCount)",
         "function createOrUpdateSession(address sessionKey, uint256 expirationTime) external returns(int256)",
         "function sessionExpirationTime(address owner) external view returns(uint256 expirationTime)",
         "function endSession() external",

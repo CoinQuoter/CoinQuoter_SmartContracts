@@ -34,10 +34,16 @@ interface ITradingSession {
      */
     event SessionTerminated(address indexed sender, address indexed sessionKey);
 
-    // details about the taker - maker session
+    // Session status returned in createOrUpdateSession
+    enum SessionStatus {
+        Created,
+        Updated
+    }
+
+    // Session data
     struct Session {
-        // Address of maker
-        address maker;
+        // Address of creator
+        address creator;
         // Public key of session
         address sessionKey;
         // Session expiration time (unix timestamp)
@@ -48,7 +54,7 @@ interface ITradingSession {
 
     function createOrUpdateSession(address sessionKey, uint256 expirationTime)
         external
-        returns (int256);
+        returns (SessionStatus);
 
     function endSession() external;
 
@@ -61,7 +67,7 @@ interface ITradingSession {
         external
         view
         returns (
-            address maker,
+            address creator,
             address sessionKey,
             uint256 expirationTime,
             uint256 txCount
