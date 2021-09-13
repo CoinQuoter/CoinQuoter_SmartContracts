@@ -14,11 +14,15 @@ import "./helpers/ERC20Proxy.sol";
 import "./helpers/ERC721Proxy.sol";
 import "./helpers/NonceManager.sol";
 import "./helpers/PredicateHelper.sol";
+import "./helpers/Multicall.sol";
 import "./interfaces/InteractiveMaker.sol";
 import "./interfaces/ITradingSession.sol";
+import "./interfaces/IBalanceAccessor.sol";
 import "./libraries/UncheckedAddress.sol";
 import "./libraries/ArgumentsDecoder.sol";
 import "./libraries/SilentECDSA.sol";
+
+import "hardhat/console.sol";
 
 /// @title 1inch Limit Order Protocol v1
 contract LimitOrderProtocol is
@@ -32,7 +36,9 @@ contract LimitOrderProtocol is
     NonceManager,
     PredicateHelper,
     ReentrancyGuard,
-    ITradingSession
+    UniswapInterfaceMulticall,
+    ITradingSession,
+    IBalanceAccessor
 {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -42,41 +48,54 @@ contract LimitOrderProtocol is
     // Expiration Mask:
     //   predicate := PredicateHelper.timestampBelow(deadline)
     //
-    // Maker Nonce:
-    //   predicate := this.nonceEquals(makerAddress, makerNonce)
+    // Taker Nonce:
+    //   predicate := this.nonceEquals(takerAddress, takerNonce)
 
     modifier sessionNotExpired(OrderRFQ memory order) {
-        address maker = order.makerAssetData.decodeAddress(_FROM_INDEX);
+        // Require taker session to be valid, ie. not expired
+        address taker = order.takerAssetData.decodeAddress(_FROM_INDEX);
+        require(
+            _sessions[taker].expirationTime >= block.timestamp,
+            "LOP: EXP MAKER"
+        );
 
-        // require(maker == _sessions[maker].maker, "LOP: NM");
-        require(block.timestamp <= _sessions[maker].expirationTime, "LOP: EXP");
+        // Require maker session to be valid, ie. not expired
+        address maker = order.makerAssetData.decodeAddress(_FROM_INDEX);
+        require(
+            _sessions[maker].expirationTime >= block.timestamp,
+            "LOP: EXP TAKER"
+        );
+
         _;
     }
 
     event OrderFilled(
-        address indexed maker,
+        address indexed taker,
         bytes32 orderHash,
         uint256 remaining
     );
 
-    event OrderFilledRFQ(bytes32 orderHash, uint256 makingAmount);
+    event OrderFilledRFQ(bytes32 orderHash, uint256 takingAmount);
 
     struct OrderRFQ {
         uint256 info;
-        address makerAsset;
+        uint256 feeAmount;
         address takerAsset;
-        bytes makerAssetData; // (transferFrom.selector, signer, ______, makerAmount, ...)
-        bytes takerAssetData; // (transferFrom.selector, sender, signer, takerAmount, ...)
+        address makerAsset;
+        address feeTokenAddress;
+        address frontendAddress;
+        bytes takerAssetData; // (transferFrom.selector, signer, ______, takerAmount, ...)
+        bytes makerAssetData; // (transferFrom.selector, sender, signer, makerAmount, ...)
     }
 
     struct Order {
         uint256 salt;
-        address makerAsset;
         address takerAsset;
-        bytes makerAssetData; // (transferFrom.selector, signer, ______, makerAmount, ...)
-        bytes takerAssetData; // (transferFrom.selector, sender, signer, takerAmount, ...)
-        bytes getMakerAmount; // this.staticcall(abi.encodePacked(bytes, swapTakerAmount)) => (swapMakerAmount)
+        address makerAsset;
+        bytes takerAssetData; // (transferFrom.selector, signer, ______, takerAmount, ...)
+        bytes makerAssetData; // (transferFrom.selector, sender, signer, makerAmount, ...)
         bytes getTakerAmount; // this.staticcall(abi.encodePacked(bytes, swapMakerAmount)) => (swapTakerAmount)
+        bytes getMakerAmount; // this.staticcall(abi.encodePacked(bytes, swapTakerAmount)) => (swapMakerAmount)
         bytes predicate; // this.staticcall(bytes) => (bool)
         bytes permit; // On first fill: permit.1.call(abi.encodePacked(permit.selector, permit.2))
         bytes interaction;
@@ -84,12 +103,12 @@ contract LimitOrderProtocol is
 
     bytes32 public constant LIMIT_ORDER_TYPEHASH =
         keccak256(
-            "Order(uint256 salt,address makerAsset,address takerAsset,bytes makerAssetData,bytes takerAssetData,bytes getMakerAmount,bytes getTakerAmount,bytes predicate,bytes permit,bytes interaction)"
+            "Order(uint256 salt,address takerAsset,address makerAsset,bytes takerAssetData,bytes makerAssetData,bytes getTakerAmount,bytes getMakerAmount,bytes predicate,bytes permit,bytes interaction)"
         );
 
     bytes32 public constant LIMIT_ORDER_RFQ_TYPEHASH =
         keccak256(
-            "OrderRFQ(uint256 info,address makerAsset,address takerAsset,bytes makerAssetData,bytes takerAssetData)"
+            "OrderRFQ(uint256 info,uint256 feeAmount,address takerAsset,address makerAsset,address feeTokenAddress,address frontendAddress,bytes takerAssetData,bytes makerAssetData)"
         );
 
     // solhint-disable-next-line var-name-mixedcase
@@ -102,7 +121,13 @@ contract LimitOrderProtocol is
 
     mapping(bytes32 => uint256) private _remaining;
     mapping(address => mapping(uint256 => uint256)) private _invalidator;
+
+    // Mapping of balance owner (either maker or frontend) to amount
+    mapping(address => mapping(address => Balance)) private _balances;
+    // Mapping of session owner to session
     mapping(address => Session) private _sessions;
+    // Mapping of session public key to session owner
+    mapping(address => address) private _sessionOwners;
 
     // solhint-disable-next-line func-name-mixedcase
     function DOMAIN_SEPARATOR() external view returns (bytes32) {
@@ -134,12 +159,12 @@ contract LimitOrderProtocol is
 
     /// @notice Returns bitmask for double-spend invalidators based on lowest byte of order.info and filled quotes
     /// @return Result Each bit represents whenever corresponding quote was filled
-    function invalidatorForOrderRFQ(address maker, uint256 slot)
+    function invalidatorForOrderRFQ(address taker, uint256 slot)
         external
         view
         returns (uint256)
     {
-        return _invalidator[maker][slot];
+        return _invalidator[taker][slot];
     }
 
     /// @notice Checks order predicate
@@ -179,7 +204,7 @@ contract LimitOrderProtocol is
     /// @notice Cancels order by setting remaining amount to zero
     function cancelOrder(Order memory order) external {
         require(
-            order.makerAssetData.decodeAddress(_FROM_INDEX) == msg.sender,
+            order.takerAssetData.decodeAddress(_FROM_INDEX) == msg.sender,
             "LOP: Access denied"
         );
 
@@ -197,20 +222,20 @@ contract LimitOrderProtocol is
     /// @notice Fills order's quote, fully or partially (whichever is possible)
     /// @param order Order quote to fill
     /// @param signature Signature to confirm quote ownership
-    /// @param makingAmount Making amount
     /// @param takingAmount Taking amount
+    /// @param makingAmount Making amount
     function fillOrderRFQ(
         OrderRFQ memory order,
         bytes calldata signature,
-        uint256 makingAmount,
-        uint256 takingAmount
+        uint256 takingAmount,
+        uint256 makingAmount
     ) external sessionNotExpired(order) returns (uint256, uint256) {
         return
             fillOrderRFQTo(
                 order,
                 signature,
-                makingAmount,
                 takingAmount,
+                makingAmount,
                 msg.sender
             );
     }
@@ -218,8 +243,8 @@ contract LimitOrderProtocol is
     function fillOrderRFQToWithPermit(
         OrderRFQ memory order,
         bytes calldata signature,
-        uint256 makingAmount,
         uint256 takingAmount,
+        uint256 makingAmount,
         address target,
         bytes calldata permit
     ) external returns (uint256, uint256) {
@@ -228,8 +253,8 @@ contract LimitOrderProtocol is
             fillOrderRFQTo(
                 order,
                 signature,
-                makingAmount,
                 takingAmount,
+                makingAmount,
                 target
             );
     }
@@ -237,8 +262,8 @@ contract LimitOrderProtocol is
     function fillOrderRFQTo(
         OrderRFQ memory order,
         bytes calldata signature,
-        uint256 makingAmount,
         uint256 takingAmount,
+        uint256 makingAmount,
         address target
     ) public returns (uint256, uint256) {
         // Check time expiration
@@ -251,93 +276,103 @@ contract LimitOrderProtocol is
         {
             // Stack too deep
             // Validate double spend
-            address maker = order.makerAssetData.decodeAddress(_FROM_INDEX);
+            address taker = order.takerAssetData.decodeAddress(_FROM_INDEX);
             uint256 invalidatorSlot = uint64(order.info) >> 8;
             uint256 invalidatorBit = 1 << uint8(order.info);
-            uint256 invalidator = _invalidator[maker][invalidatorSlot];
+            uint256 invalidator = _invalidator[taker][invalidatorSlot];
             require(invalidator & invalidatorBit == 0, "LOP: already filled");
-            _invalidator[maker][invalidatorSlot] = invalidator | invalidatorBit;
+            _invalidator[taker][invalidatorSlot] = invalidator | invalidatorBit;
         }
 
         // Compute partial fill if needed
-        uint256 orderMakerAmount = order.makerAssetData.decodeUint256(
-            _AMOUNT_INDEX
-        );
         uint256 orderTakerAmount = order.takerAssetData.decodeUint256(
             _AMOUNT_INDEX
         );
-        if (takingAmount == 0 && makingAmount == 0) {
+        uint256 orderMakerAmount = order.makerAssetData.decodeUint256(
+            _AMOUNT_INDEX
+        );
+        if (makingAmount == 0 && takingAmount == 0) {
             // Two zeros means whole order
-            makingAmount = orderMakerAmount;
             takingAmount = orderTakerAmount;
-        } else if (takingAmount == 0) {
-            takingAmount =
-                (makingAmount * orderTakerAmount + orderMakerAmount - 1) /
-                orderMakerAmount;
+            makingAmount = orderMakerAmount;
         } else if (makingAmount == 0) {
-            makingAmount = (takingAmount * orderMakerAmount) / orderTakerAmount;
+            makingAmount =
+                (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
+                orderTakerAmount;
+        } else if (takingAmount == 0) {
+            //takingAmount = (makingAmount * orderTakerAmount) / orderMakerAmount;
+
+            // If making amount is specified, taking amount should stay the same as in signed RFQ order
+            takingAmount = orderTakerAmount;
         } else {
             revert("LOP: one of amounts should be 0");
         }
 
+        // console.log("Taking amount: %s", takingAmount);
+        // console.log("Making amount: %s", makingAmount);
+
         require(
-            makingAmount > 0 && takingAmount > 0,
+            takingAmount > 0 && makingAmount > 0,
             "LOP: can't swap 0 amount"
-        );
-        require(
-            makingAmount <= orderMakerAmount,
-            "LOP: making amount exceeded"
         );
         require(
             takingAmount <= orderTakerAmount,
             "LOP: taking amount exceeded"
         );
 
+        // Let maker make transaction for bigger quote than order makingAmount
+        require(
+            makingAmount >= orderMakerAmount,
+            "LOP: making amount exceeded"
+        );
+
         // Validate order
         bytes32 orderHash = _hash(order);
         _validate(
-            order.makerAssetData,
             order.takerAssetData,
+            order.makerAssetData,
             signature,
             orderHash
         );
 
-        // Maker => Taker, Taker => Maker
-        _callMakerAssetTransferFrom(
-            order.makerAsset,
-            order.makerAssetData,
-            target,
-            makingAmount
-        );
+        // Taker => Maker, Maker => Taker
         _callTakerAssetTransferFrom(
             order.takerAsset,
             order.takerAssetData,
+            target,
             takingAmount
         );
+        _callMakerAssetTransferFrom(
+            order.makerAsset,
+            order.makerAssetData,
+            makingAmount
+        );
 
-        emit OrderFilledRFQ(orderHash, makingAmount);
-        return (makingAmount, takingAmount);
+        _updateSessionTransactions(order.takerAssetData, order.makerAssetData);
+
+        emit OrderFilledRFQ(orderHash, takingAmount);
+        return (takingAmount, makingAmount);
     }
 
-    /// @notice Fills an order. If one doesn't exist (first fill) it will be created using order.makerAssetData
+    /// @notice Fills an order. If one doesn't exist (first fill) it will be created using order.takerAssetData
     /// @param order Order quote to fill
     /// @param signature Signature to confirm quote ownership
-    /// @param makingAmount Making amount
     /// @param takingAmount Taking amount
-    /// @param thresholdAmount If makingAmout > 0 this is max takingAmount, else it is min makingAmount
+    /// @param makingAmount Making amount
+    /// @param thresholdAmount If takingAmout > 0 this is max makingAmount, else it is min takingAmount
     function fillOrder(
         Order memory order,
         bytes calldata signature,
-        uint256 makingAmount,
         uint256 takingAmount,
+        uint256 makingAmount,
         uint256 thresholdAmount
     ) external returns (uint256, uint256) {
         return
             fillOrderTo(
                 order,
                 signature,
-                makingAmount,
                 takingAmount,
+                makingAmount,
                 thresholdAmount,
                 msg.sender
             );
@@ -346,8 +381,8 @@ contract LimitOrderProtocol is
     function fillOrderToWithPermit(
         Order memory order,
         bytes calldata signature,
-        uint256 makingAmount,
         uint256 takingAmount,
+        uint256 makingAmount,
         uint256 thresholdAmount,
         address target,
         bytes calldata permit
@@ -357,8 +392,8 @@ contract LimitOrderProtocol is
             fillOrderTo(
                 order,
                 signature,
-                makingAmount,
                 takingAmount,
+                makingAmount,
                 thresholdAmount,
                 target
             );
@@ -367,8 +402,8 @@ contract LimitOrderProtocol is
     function fillOrderTo(
         Order memory order,
         bytes calldata signature,
-        uint256 makingAmount,
         uint256 takingAmount,
+        uint256 makingAmount,
         uint256 thresholdAmount,
         address target
     ) public returns (uint256, uint256) {
@@ -376,21 +411,21 @@ contract LimitOrderProtocol is
 
         {
             // Stack too deep
-            uint256 remainingMakerAmount;
+            uint256 remainingTakerAmount;
             {
                 // Stack too deep
                 bool orderExists;
-                (orderExists, remainingMakerAmount) = _remaining[orderHash]
+                (orderExists, remainingTakerAmount) = _remaining[orderHash]
                     .trySub(1);
                 if (!orderExists) {
-                    // First fill: validate order and permit maker asset
+                    // First fill: validate order and permit taker asset
                     _validate(
-                        order.makerAssetData,
                         order.takerAssetData,
+                        order.makerAssetData,
                         signature,
                         orderHash
                     );
-                    remainingMakerAmount = order.makerAssetData.decodeUint256(
+                    remainingTakerAmount = order.takerAssetData.decodeUint256(
                         _AMOUNT_INDEX
                     );
                     if (order.permit.length > 0) {
@@ -408,87 +443,97 @@ contract LimitOrderProtocol is
                 require(checkPredicate(order), "LOP: predicate returned false");
             }
 
-            // Compute maker and taker assets amount
-            if ((takingAmount == 0) == (makingAmount == 0)) {
+            // Compute taker and maker assets amount
+            if ((makingAmount == 0) == (takingAmount == 0)) {
                 revert("LOP: only one amount should be 0");
-            } else if (takingAmount == 0) {
-                if (makingAmount > remainingMakerAmount) {
-                    makingAmount = remainingMakerAmount;
+            } else if (makingAmount == 0) {
+                if (takingAmount > remainingTakerAmount) {
+                    takingAmount = remainingTakerAmount;
                 }
-                takingAmount = _callGetTakerAmount(order, makingAmount);
+                makingAmount = _callGetMakerAmount(order, takingAmount);
                 require(
-                    takingAmount <= thresholdAmount,
-                    "LOP: taking amount too high"
+                    makingAmount <= thresholdAmount,
+                    "LOP: making amount too high"
                 );
             } else {
-                makingAmount = _callGetMakerAmount(order, takingAmount);
-                if (makingAmount > remainingMakerAmount) {
-                    makingAmount = remainingMakerAmount;
-                    takingAmount = _callGetTakerAmount(order, makingAmount);
+                takingAmount = _callGetTakerAmount(order, makingAmount);
+                if (takingAmount > remainingTakerAmount) {
+                    takingAmount = remainingTakerAmount;
+                    makingAmount = _callGetMakerAmount(order, takingAmount);
                 }
                 require(
-                    makingAmount >= thresholdAmount,
-                    "LOP: making amount too low"
+                    takingAmount >= thresholdAmount,
+                    "LOP: taking amount too low"
                 );
             }
 
             require(
-                makingAmount > 0 && takingAmount > 0,
+                takingAmount > 0 && makingAmount > 0,
                 "LOP: can't swap 0 amount"
             );
 
             // Update remaining amount in storage
 
             unchecked {
-                remainingMakerAmount = remainingMakerAmount - makingAmount;
-                _remaining[orderHash] = remainingMakerAmount + 1;
+                remainingTakerAmount = remainingTakerAmount - takingAmount;
+                _remaining[orderHash] = remainingTakerAmount + 1;
             }
-            emit OrderFilled(msg.sender, orderHash, remainingMakerAmount);
-        }
-
-        // Taker => Maker
-        _callTakerAssetTransferFrom(
-            order.takerAsset,
-            order.takerAssetData,
-            takingAmount
-        );
-
-        // Maker can handle funds interactively
-        if (order.interaction.length > 0) {
-            InteractiveMaker(order.makerAssetData.decodeAddress(_FROM_INDEX))
-                .notifyFillOrder(
-                    order.makerAsset,
-                    order.takerAsset,
-                    makingAmount,
-                    takingAmount,
-                    order.interaction
-                );
+            emit OrderFilled(msg.sender, orderHash, remainingTakerAmount);
         }
 
         // Maker => Taker
         _callMakerAssetTransferFrom(
             order.makerAsset,
             order.makerAssetData,
-            target,
             makingAmount
         );
 
-        return (makingAmount, takingAmount);
+        // Taker can handle funds interactively
+        if (order.interaction.length > 0) {
+            InteractiveMaker(order.takerAssetData.decodeAddress(_FROM_INDEX))
+                .notifyFillOrder(
+                    order.takerAsset,
+                    order.makerAsset,
+                    takingAmount,
+                    makingAmount,
+                    order.interaction
+                );
+        }
+
+        // Taker => Maker
+        _callTakerAssetTransferFrom(
+            order.takerAsset,
+            order.takerAssetData,
+            target,
+            takingAmount
+        );
+
+        return (takingAmount, makingAmount);
     }
 
     function createOrUpdateSession(address sessionKey, uint256 expirationTime)
         external
         override
         nonReentrant
-        returns (int256)
+        returns (SessionStatus)
     {
         _validateSessionKey(sessionKey);
-        require(expirationTime > block.timestamp, "LOP: EXP");
+        require(
+            _sessionOwners[sessionKey] == address(0) ||
+                _sessionOwners[sessionKey] == msg.sender,
+            "LOP: ISO"
+        );
+        require(expirationTime >= block.timestamp, "LOP: EXP");
 
+        // Update current session if session slot exists
         if (_sessions[msg.sender].sessionKey != address(0)) {
             _sessions[msg.sender].expirationTime = expirationTime;
+
+            // Update session key if its different from the storage key
             if (_sessions[msg.sender].sessionKey != sessionKey) {
                 _sessions[msg.sender].sessionKey = sessionKey;
+
+                _sessionOwners[sessionKey] = msg.sender;
             }
 
             emit SessionUpdated(
@@ -497,14 +542,16 @@ contract LimitOrderProtocol is
                 expirationTime
             );
 
-            return 1;
+            return SessionStatus.Updated;
         } else {
             _sessions[msg.sender] = Session({
-                maker: address(msg.sender),
+                creator: address(msg.sender),
                 sessionKey: sessionKey,
                 expirationTime: expirationTime,
                 txCount: 0
             });
+
+            _sessionOwners[sessionKey] = msg.sender;
 
             emit SessionCreated(
                 msg.sender,
@@ -513,7 +560,7 @@ contract LimitOrderProtocol is
             );
         }
 
-        return 0;
+        return SessionStatus.Created;
     }
 
     function endSession() external override nonReentrant {
@@ -521,7 +568,7 @@ contract LimitOrderProtocol is
         require(_sessions[msg.sender].expirationTime != 0, "LOP: IS");
         require(
             _sessions[msg.sender].expirationTime >= block.timestamp,
-            "LOP: ES"
+            "LOP: EXP"
         );
 
         _sessions[msg.sender].expirationTime = 0;
@@ -543,14 +590,14 @@ contract LimitOrderProtocol is
         view
         override
         returns (
-            address maker,
+            address taker,
             address sessionKey,
             uint256 expirationTime,
             uint256 txCount
         )
     {
         return (
-            _sessions[owner].maker,
+            _sessions[owner].creator,
             _sessions[owner].sessionKey,
             _sessions[owner].expirationTime,
             _sessions[owner].txCount
@@ -581,12 +628,12 @@ contract LimitOrderProtocol is
                     abi.encode(
                         LIMIT_ORDER_TYPEHASH,
                         order.salt,
-                        order.makerAsset,
                         order.takerAsset,
-                        keccak256(order.makerAssetData),
+                        order.makerAsset,
                         keccak256(order.takerAssetData),
-                        keccak256(order.getMakerAmount),
+                        keccak256(order.makerAssetData),
                         keccak256(order.getTakerAmount),
+                        keccak256(order.getMakerAmount),
                         keccak256(order.predicate),
                         keccak256(order.permit),
                         keccak256(order.interaction)
@@ -602,44 +649,47 @@ contract LimitOrderProtocol is
                     abi.encode(
                         LIMIT_ORDER_RFQ_TYPEHASH,
                         order.info,
-                        order.makerAsset,
+                        order.feeAmount,
                         order.takerAsset,
-                        keccak256(order.makerAssetData),
-                        keccak256(order.takerAssetData)
+                        order.makerAsset,
+                        order.feeTokenAddress,
+                        order.frontendAddress,
+                        keccak256(order.takerAssetData),
+                        keccak256(order.makerAssetData)
                     )
                 )
             );
     }
 
     function _validate(
-        bytes memory makerAssetData,
         bytes memory takerAssetData,
+        bytes memory makerAssetData,
         bytes memory signature,
         bytes32 orderHash
     ) private view {
-        require(makerAssetData.length >= 100, "LOP: bad makerAssetData.length");
         require(takerAssetData.length >= 100, "LOP: bad takerAssetData.length");
-        bytes4 makerSelector = makerAssetData.decodeSelector();
+        require(makerAssetData.length >= 100, "LOP: bad makerAssetData.length");
         bytes4 takerSelector = takerAssetData.decodeSelector();
-        require(
-            makerSelector >= IERC20.transferFrom.selector &&
-                makerSelector <= _MAX_SELECTOR,
-            "LOP: bad makerAssetData.selector"
-        );
+        bytes4 makerSelector = makerAssetData.decodeSelector();
         require(
             takerSelector >= IERC20.transferFrom.selector &&
                 takerSelector <= _MAX_SELECTOR,
             "LOP: bad takerAssetData.selector"
         );
+        require(
+            makerSelector >= IERC20.transferFrom.selector &&
+                makerSelector <= _MAX_SELECTOR,
+            "LOP: bad makerAssetData.selector"
+        );
 
-        address maker = _sessions[
-            address(makerAssetData.decodeAddress(_FROM_INDEX))
+        address taker = _sessions[
+            address(takerAssetData.decodeAddress(_FROM_INDEX))
         ].sessionKey;
         if (
             (signature.length != 65 && signature.length != 64) ||
-            SilentECDSA.recover(orderHash, signature) != maker
+            SilentECDSA.recover(orderHash, signature) != taker
         ) {
-            bytes memory result = maker.uncheckedFunctionStaticCall(
+            bytes memory result = taker.uncheckedFunctionStaticCall(
                 abi.encodeWithSelector(
                     IERC1271.isValidSignature.selector,
                     orderHash,
@@ -656,50 +706,24 @@ contract LimitOrderProtocol is
         }
     }
 
-    function _callMakerAssetTransferFrom(
-        address makerAsset,
-        bytes memory makerAssetData,
-        address taker,
-        uint256 makingAmount
-    ) private {
-        // Patch receiver or validate private order
-        address orderTakerAddress = makerAssetData.decodeAddress(_TO_INDEX);
-        if (orderTakerAddress != address(0)) {
-            require(orderTakerAddress == msg.sender, "LOP: private order");
-        }
-        if (orderTakerAddress != taker) {
-            makerAssetData.patchAddress(_TO_INDEX, taker);
-        }
-
-        // Patch maker amount
-        makerAssetData.patchUint256(_AMOUNT_INDEX, makingAmount);
-
-        require(
-            makerAsset != address(0) &&
-                makerAsset != 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE,
-            "LOP: raw ETH is not supported"
-        );
-
-        // Transfer asset from maker to taker
-        bytes memory result = makerAsset.uncheckedFunctionCall(
-            makerAssetData,
-            "LOP: makerAsset.call failed"
-        );
-        if (result.length > 0) {
-            require(
-                abi.decode(result, (bool)),
-                "LOP: makerAsset.call bad result"
-            );
-        }
-    }
-
     function _callTakerAssetTransferFrom(
         address takerAsset,
         bytes memory takerAssetData,
+        address maker,
         uint256 takingAmount
     ) private {
-        // Patch spender
-        takerAssetData.patchAddress(_FROM_INDEX, msg.sender);
+        // Patch receiver or validate private order
+        address orderMakerAddress = takerAssetData.decodeAddress(_TO_INDEX);
+
+        if (orderMakerAddress != address(0)) {
+            require(
+                msg.sender == _sessions[orderMakerAddress].sessionKey,
+                "LOP: private order"
+            );
+        }
+        if (orderMakerAddress != maker) {
+            takerAssetData.patchAddress(_TO_INDEX, _sessionOwners[msg.sender]);
+        }
 
         // Patch taker amount
         takerAssetData.patchUint256(_AMOUNT_INDEX, takingAmount);
@@ -723,24 +747,48 @@ contract LimitOrderProtocol is
         }
     }
 
-    function _callGetMakerAmount(Order memory order, uint256 takerAmount)
-        private
-        view
-        returns (uint256 makerAmount)
-    {
-        if (
-            order.getMakerAmount.length == 0 &&
-            takerAmount == order.takerAssetData.decodeUint256(_AMOUNT_INDEX)
-        ) {
-            // On empty order.getMakerAmount calldata only whole fills are allowed
-            return order.makerAssetData.decodeUint256(_AMOUNT_INDEX);
-        }
-        bytes memory result = address(this).uncheckedFunctionStaticCall(
-            abi.encodePacked(order.getMakerAmount, takerAmount),
-            "LOP: getMakerAmount call failed"
+    function _callMakerAssetTransferFrom(
+        address makerAsset,
+        bytes memory makerAssetData,
+        uint256 makingAmount
+    ) private {
+        // Patch spender
+        makerAssetData.patchAddress(_FROM_INDEX, _sessionOwners[msg.sender]);
+
+        // Patch maker amount
+        makerAssetData.patchUint256(_AMOUNT_INDEX, makingAmount);
+
+        require(
+            makerAsset != address(0) &&
+                makerAsset != 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE,
+            "LOP: raw ETH is not supported"
         );
-        require(result.length == 32, "LOP: invalid getMakerAmount ret");
-        return abi.decode(result, (uint256));
+
+        // Transfer asset from maker to taker
+        bytes memory result = makerAsset.uncheckedFunctionCall(
+            makerAssetData,
+            "LOP: makerAsset.call failed"
+        );
+        if (result.length > 0) {
+            require(
+                abi.decode(result, (bool)),
+                "LOP: makerAsset.call bad result"
+            );
+        }
+    }
+
+    function _updateSessionTransactions(
+        bytes memory takerAssetData,
+        bytes memory makerAssetData
+    ) internal returns (uint256 txCountTaker, uint256 txCountMaker) {
+        address orderTakerAddress = takerAssetData.decodeAddress(_TO_INDEX);
+        require(orderTakerAddress != address(0), "LOP: OMA0");
+
+        address orderMakerAddress = makerAssetData.decodeAddress(_TO_INDEX);
+        require(orderMakerAddress != address(0), "LOP: OTA0");
+
+        txCountTaker = ++_sessions[orderTakerAddress].txCount;
+        txCountMaker = ++_sessions[orderMakerAddress].txCount;
     }
 
     function _callGetTakerAmount(Order memory order, uint256 makerAmount)
@@ -761,5 +809,66 @@ contract LimitOrderProtocol is
         );
         require(result.length == 32, "LOP: invalid getTakerAmount ret");
         return abi.decode(result, (uint256));
+    }
+
+    function _callGetMakerAmount(Order memory order, uint256 takerAmount)
+        private
+        view
+        returns (uint256 makerAmount)
+    {
+        if (
+            order.getMakerAmount.length == 0 &&
+            takerAmount == order.takerAssetData.decodeUint256(_AMOUNT_INDEX)
+        ) {
+            // On empty order.getMakerAmount calldata only whole fills are allowed
+            return order.makerAssetData.decodeUint256(_AMOUNT_INDEX);
+        }
+        bytes memory result = address(this).uncheckedFunctionStaticCall(
+            abi.encodePacked(order.getMakerAmount, takerAmount),
+            "LOP: getMakerAmount call failed"
+        );
+        require(result.length == 32, "LOP: invalid getMakerAmount ret");
+        return abi.decode(result, (uint256));
+    }
+
+    function depositToken(address token, uint256 amount)
+        external
+        override
+        nonReentrant
+        returns (uint256)
+    {
+        require(token != address(0), "LOP: 0TA");
+        require(token != address(this), "LOP: ITA");
+        require(amount > 0, "LOP: 0A");
+
+        IERC20 tokenERC20 = IERC20(token);
+        tokenERC20.safeTransferFrom(msg.sender, address(this), amount);
+
+        _balances[msg.sender][token].balance += amount;
+        return _balances[msg.sender][token].balance;
+    }
+
+    function withdrawToken(address token, uint256 amount)
+        external
+        override
+        nonReentrant
+        returns (uint256)
+    {
+        require(token != address(0), "LOP: 0TA");
+        require(token != address(this), "LOP: ITA");
+        require(_sessionOwners[msg.sender] == address(0), "LOP: SKW");
+        require(amount > 0, "LOP: 0A");
+        require(_balances[msg.sender][token].balance >= amount, "LOP: BNE");
+
+        IERC20 tokenERC20 = IERC20(token);
+        tokenERC20.safeTransfer(msg.sender, amount);
+
+        _balances[msg.sender][token].balance -= amount;
+
+        return _balances[msg.sender][token].balance;
+    }
+
+    function balance(address token) external view override returns (uint256) {
+        return _balances[msg.sender][token].balance;
     }
 }
