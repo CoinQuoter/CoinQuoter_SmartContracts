@@ -137,6 +137,9 @@ function createOrder(params: CreatingParams): RFQOrder {
         takerAmount: params.takerAmount,
         makerAmount: params.makerAmount,
         makerAddress: params.makerAddress || undefined,
+        feeAmount: params.feeAmount,
+        feeTokenAddress: params.feeTokenAddress,
+        frontendAddress: params.frontendAddress,
     });
 }
 /* eslint-enable max-lines-per-function */

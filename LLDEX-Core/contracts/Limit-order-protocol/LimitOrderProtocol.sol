@@ -14,8 +14,10 @@ import "./helpers/ERC20Proxy.sol";
 import "./helpers/ERC721Proxy.sol";
 import "./helpers/NonceManager.sol";
 import "./helpers/PredicateHelper.sol";
+import "./helpers/Multicall.sol";
 import "./interfaces/InteractiveMaker.sol";
 import "./interfaces/ITradingSession.sol";
+import "./interfaces/IBalanceAccessor.sol";
 import "./libraries/UncheckedAddress.sol";
 import "./libraries/ArgumentsDecoder.sol";
 import "./libraries/SilentECDSA.sol";
@@ -34,7 +36,9 @@ contract LimitOrderProtocol is
     NonceManager,
     PredicateHelper,
     ReentrancyGuard,
-    ITradingSession
+    UniswapInterfaceMulticall,
+    ITradingSession,
+    IBalanceAccessor
 {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -75,8 +79,11 @@ contract LimitOrderProtocol is
 
     struct OrderRFQ {
         uint256 info;
+        uint256 feeAmount;
         address takerAsset;
         address makerAsset;
+        address feeTokenAddress;
+        address frontendAddress;
         bytes takerAssetData; // (transferFrom.selector, signer, ______, takerAmount, ...)
         bytes makerAssetData; // (transferFrom.selector, sender, signer, makerAmount, ...)
     }
@@ -101,7 +108,7 @@ contract LimitOrderProtocol is
 
     bytes32 public constant LIMIT_ORDER_RFQ_TYPEHASH =
         keccak256(
-            "OrderRFQ(uint256 info,address takerAsset,address makerAsset,bytes takerAssetData,bytes makerAssetData)"
+            "OrderRFQ(uint256 info,uint256 feeAmount,address takerAsset,address makerAsset,address feeTokenAddress,address frontendAddress,bytes takerAssetData,bytes makerAssetData)"
         );
 
     // solhint-disable-next-line var-name-mixedcase
@@ -114,7 +121,12 @@ contract LimitOrderProtocol is
 
     mapping(bytes32 => uint256) private _remaining;
     mapping(address => mapping(uint256 => uint256)) private _invalidator;
+
+    // Mapping of balance owner (either maker or frontend) to amount
+    mapping(address => mapping(address => Balance)) private _balances;
+    // Mapping of session owner to session
     mapping(address => Session) private _sessions;
+    // Mapping of session public key to session owner
     mapping(address => address) private _sessionOwners;
 
     // solhint-disable-next-line func-name-mixedcase
@@ -288,10 +300,16 @@ contract LimitOrderProtocol is
                 (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
                 orderTakerAmount;
         } else if (takingAmount == 0) {
-            takingAmount = (makingAmount * orderTakerAmount) / orderMakerAmount;
+            //takingAmount = (makingAmount * orderTakerAmount) / orderMakerAmount;
+
+            // If making amount is specified, taking amount should stay the same as in signed RFQ order
+            takingAmount = orderTakerAmount;
         } else {
             revert("LOP: one of amounts should be 0");
         }
+
+        // console.log("Taking amount: %s", takingAmount);
+        // console.log("Making amount: %s", makingAmount);
 
         require(
             takingAmount > 0 && makingAmount > 0,
@@ -301,8 +319,10 @@ contract LimitOrderProtocol is
             takingAmount <= orderTakerAmount,
             "LOP: taking amount exceeded"
         );
+
+        // Let maker make transaction for bigger quote than order makingAmount
         require(
-            makingAmount <= orderMakerAmount,
+            makingAmount >= orderMakerAmount,
             "LOP: making amount exceeded"
         );
 
@@ -629,8 +649,11 @@ contract LimitOrderProtocol is
                     abi.encode(
                         LIMIT_ORDER_RFQ_TYPEHASH,
                         order.info,
+                        order.feeAmount,
                         order.takerAsset,
                         order.makerAsset,
+                        order.feeTokenAddress,
+                        order.frontendAddress,
                         keccak256(order.takerAssetData),
                         keccak256(order.makerAssetData)
                     )
@@ -729,16 +752,6 @@ contract LimitOrderProtocol is
         bytes memory makerAssetData,
         uint256 makingAmount
     ) private {
-        // address orderMakerAddress = makerAssetData.decodeAddress(_TO_INDEX);
-
-        // // TODO msg.sender to session key
-        // console.log("Maker address %s", orderMakerAddress);
-        // console.log("Session owner %s", _sessionOwners[msg.sender]);
-        // console.log("Session key %s", _sessionOwners[msg.sender]);
-
-        // console.log("Sender address %s", msg.sender);
-        // console.log("Session key %s", _sessions[orderMakerAddress].sessionKey);
-
         // Patch spender
         makerAssetData.patchAddress(_FROM_INDEX, _sessionOwners[msg.sender]);
 
@@ -816,5 +829,46 @@ contract LimitOrderProtocol is
         );
         require(result.length == 32, "LOP: invalid getMakerAmount ret");
         return abi.decode(result, (uint256));
+    }
+
+    function depositToken(address token, uint256 amount)
+        external
+        override
+        nonReentrant
+        returns (uint256)
+    {
+        require(token != address(0), "LOP: 0TA");
+        require(token != address(this), "LOP: ITA");
+        require(amount > 0, "LOP: 0A");
+
+        IERC20 tokenERC20 = IERC20(token);
+        tokenERC20.safeTransferFrom(msg.sender, address(this), amount);
+
+        _balances[msg.sender][token].balance += amount;
+        return _balances[msg.sender][token].balance;
+    }
+
+    function withdrawToken(address token, uint256 amount)
+        external
+        override
+        nonReentrant
+        returns (uint256)
+    {
+        require(token != address(0), "LOP: 0TA");
+        require(token != address(this), "LOP: ITA");
+        require(_sessionOwners[msg.sender] == address(0), "LOP: SKW");
+        require(amount > 0, "LOP: 0A");
+        require(_balances[msg.sender][token].balance >= amount, "LOP: BNE");
+
+        IERC20 tokenERC20 = IERC20(token);
+        tokenERC20.safeTransfer(msg.sender, amount);
+
+        _balances[msg.sender][token].balance -= amount;
+
+        return _balances[msg.sender][token].balance;
+    }
+
+    function balance(address token) external view override returns (uint256) {
+        return _balances[msg.sender][token].balance;
     }
 }

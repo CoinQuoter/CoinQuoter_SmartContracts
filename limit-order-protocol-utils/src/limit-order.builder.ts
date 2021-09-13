@@ -116,11 +116,17 @@ export class LimitOrderBuilder {
         makerAddress = ZERO_ADDRESS,
         takerAmount,
         makerAmount,
+        feeAmount,
+        feeTokenAddress,
+        frontendAddress,
     }: RFQOrderData): RFQOrder {
         return {
             info: generateRFQOrderInfo(id, expiresInTimestamp),
+            feeAmount: feeAmount,
             takerAsset: takerAssetAddress,
             makerAsset: makerAssetAddress,
+            feeTokenAddress: feeTokenAddress,
+            frontendAddress: frontendAddress,
             takerAssetData: this.erc20Facade.transferFrom(
                 null,
                 takerAddress,
@@ -133,6 +139,7 @@ export class LimitOrderBuilder {
                 takerAddress,
                 makerAmount
             ),
+
         };
     }
     /* eslint-enable max-lines-per-function */

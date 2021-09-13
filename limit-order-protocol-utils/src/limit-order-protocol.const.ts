@@ -38,8 +38,11 @@ export const ORDER_STRUCTURE = [
 
 export const RFQ_ORDER_STRUCTURE = [
     { name: 'info', type: 'uint256' },
+    { name: 'feeAmount', type: 'uint256' },
     { name: 'takerAsset', type: 'address' },
     { name: 'makerAsset', type: 'address' },
+    { name: 'feeTokenAddress', type: 'address' },
+    { name: 'frontendAddress', type: 'address' },
     { name: 'takerAssetData', type: 'bytes' },
     { name: 'makerAssetData', type: 'bytes' },
 ];

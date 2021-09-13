@@ -37,8 +37,6 @@ pubnub.addListener({
 
         if (evtData.type == "action" && evtData.method == "bid_execute") {
             txConfirm(evtData.data, event.message.sender);
-        } else if (evtData.type == "action" && evtData.method == "ask_execute") {
-            txConfirm(evtData.data, event.message.sender);
         }
     },
     presence: function (event) {
@@ -132,11 +130,17 @@ async function txConfirm(data: any, sender: string) {
     let takerAmount = "0"
     let makerAmount = "0"
 
+    // // Bid
+    // if (data.type == 1)
+    //     takerAmount = new Decimal(data.takerAmount).sub("10000000000000000").toFixed();
+    // else  // Ask
+    //     makerAmount = new Decimal(data.makerAmount).sub("10000000000000000").toFixed();
+
     // Bid
     if (data.type == 1)
-        takerAmount = data.takerAmount;
+        makerAmount = new Decimal(data.makerAmount).add(new Decimal("1").mul(new Decimal(10).pow(Config.token0Dec))).toFixed();
     else  // Ask
-        makerAmount = data.makerAmount;
+        makerAmount = new Decimal(data.makerAmount).add(new Decimal("1").mul(new Decimal(10).pow(Config.token1Dec))).toFixed();
 
     try {
         const result = await contract.connect(signer).fillOrderRFQ(
@@ -159,7 +163,7 @@ async function txConfirm(data: any, sender: string) {
         console.error(err);
         if (err.transaction.hash) {
             appendTransactionToList(data, err.transaction.hash);
-            txFail(err.transaction.hash);
+            txFail(err.transaction.hash, err.data?.message ?? '');
         }
     }
 }
@@ -172,11 +176,12 @@ async function txSuccess(hash: String) {
     });
 }
 
-async function txFail(hash: String) {
+async function txFail(hash: String, reason: String) {
     $(`#${hash}`).append("<p style=\"color:red\">Filling RFQ Order failed</p>")
 
     publishMessage("eth-usdt-tx", "transaction_failed", {
-        hash: hash
+        hash: hash,
+        reason: reason
     });
 }
 
@@ -515,8 +520,7 @@ async function updateSessionData() {
 
 class Config {
     static limitOrderProtocolABI: string[] = [
-        "function fillOrder(tuple(uint256 salt, address takerAsset, address makerAsset, bytes takerAssetData, bytes makerAssetData, bytes getTakerAmount, bytes getMakerAmount, bytes predicate, bytes permit, bytes interaction), bytes calldata signature, uint256 takingAmount, uint256 makingAmount, uint256 thresholdAmount) external returns(uint256, uint256)",
-        "function fillOrderRFQ(tuple(uint256 info, address takerAsset, address makerAsset, bytes takerAssetData, bytes makerAssetData), bytes calldata signature, uint256 takingAmount, uint256 makingAmount) external returns(uint256, uint256)",
+        "function fillOrderRFQ(tuple(uint256 info, uint256 feeAmount, address takerAsset, address makerAsset, address feeTokenAddress, address frontendAddress, bytes takerAssetData, bytes makerAssetData), bytes calldata signature, uint256 takingAmount, uint256 makingAmount) external returns(uint256, uint256)",
         "function session(address owner) external view returns(address taker, address sessionKey, uint256 expirationTime, uint256 txCount)",
         "function createOrUpdateSession(address sessionKey, uint256 expirationTime) external returns(int256)",
         "function sessionExpirationTime(address owner) external view returns(uint256 expirationTime)",
@@ -528,8 +532,8 @@ class Config {
         "function balanceOf(address) view returns (uint)"
     ];
     static limitOrderProtocolAddress: string = "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690";
-    static token0: string = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853";
-    static token1: string = "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e";
+    static token0: string = "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6";
+    static token1: string = "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318";
     static token0Dec: number = 18;
     static token1Dec: number = 18;
 }

@@ -5,6 +5,7 @@ export enum ChainId {
     etherumMainnet = 1,
     binanceMainnet = 56,
     polygonMainnet = 137,
+    hardhatTestnet = 31337,
 }
 
 export type LimitOrderSignature = string;
@@ -37,6 +38,9 @@ export interface RFQOrderData {
     makerAmount: string;
     takerAddress: string;
     makerAddress?: string; // Optional, by default = ZERO_ADDRESS
+    feeAmount: string;
+    feeTokenAddress: string;
+    frontendAddress: string;
 }
 
 export interface LimitOrder extends EIP712Object {
@@ -54,8 +58,11 @@ export interface LimitOrder extends EIP712Object {
 
 export interface RFQOrder extends EIP712Object {
     info: RFQOrderInfo;
+    feeAmount: string;
     takerAsset: string;
     makerAsset: string;
+    feeTokenAddress: string;
+    frontendAddress: string;
     takerAssetData: string;
     makerAssetData: string;
 }

@@ -3,11 +3,14 @@ export interface CreatingParams {
     privateKey: string;
     orderId: number;
     expiresIn: number;
+    feeAmount: string;
     takerAssetAddress: string;
     makerAssetAddress: string;
     takerAmount: string;
     makerAmount: string;
     makerAddress: string;
+    feeTokenAddress: string;
+    frontendAddress: string;
 }
 
 export interface FillingParams {

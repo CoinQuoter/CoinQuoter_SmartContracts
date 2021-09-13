@@ -116,11 +116,11 @@ window.addEventListener('DOMContentLoaded', (event) => {
     const amountOutput = <HTMLInputElement>document.getElementById('amount-out');
 
     bidButton.addEventListener('click', async () => {
-        publishMessageTomaker(TxType.Bid);
+        publishMessageToMaker(TxType.Bid);
     })
 
     askButton.addEventListener('click', async () => {
-        publishMessageTomaker(TxType.Ask);
+        publishMessageToMaker(TxType.Ask);
     })
 
 
@@ -144,7 +144,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
             } else if (evtData.type == "transaction_filled") {
                 $('#tx-status').append(`<p style=\"color:green\"> [${evtData.data.hash}] RFQ Order filled successfully</p>`)
             } else if (evtData.type == "transaction_failed") {
-                $('#tx-status').append(`<p style=\"color:red\"> [${evtData.data.hash}] Filling RFQ Order failed</p>`)
+                $('#tx-status').append(`<p style=\"color:red\"> [${evtData.data.hash}] Filling RFQ Order failed (reason: ${evtData.data.reason})</p>`)
             }
         },
         presence: function (event) {
@@ -220,7 +220,10 @@ window.addEventListener('DOMContentLoaded', (event) => {
             takerAddress: walletAddress,
             makerAddress: data.makerAddress,
             takerAmount: amountIn,
-            makerAmount: amountOut
+            makerAmount: amountOut,
+            feeTokenAddress: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+            feeAmount: "0",
+            frontendAddress: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
         });
 
         const resultEIP712 = limitOrderBuilder.buildRFQOrderTypedData(limitOrder);
@@ -239,7 +242,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
         };
     }
 
-    async function publishMessageTomaker(type: TxType) {
+    async function publishMessageToMaker(type: TxType) {
         const oneInchOrder = await sign1InchOrder(type, JSON.parse(bidButton.dataset.data));
         if (!oneInchOrder)
             return;
