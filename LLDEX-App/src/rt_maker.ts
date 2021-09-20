@@ -27,7 +27,7 @@ const pubnub = new PubNub({
 });
 
 pubnub.subscribe({
-    channels: ['eth-usdt-tx'],
+    channels: ['eth-usdt-tx-1'],
     withPresence: true
 });
 
@@ -87,7 +87,7 @@ conn.onmessage = async function (evt) {
         appendPriceToList(content_to_send);
 
         pubnub.publish({
-            channel: "eth-usdt-tx",
+            channel: "eth-usdt-tx-1",
             message: {
                 content: {
                     type: "stream_depth",
@@ -130,17 +130,12 @@ async function txConfirm(data: any, sender: string) {
     let takerAmount = "0"
     let makerAmount = "0"
 
-    // // Bid
-    // if (data.type == 1)
-    //     takerAmount = new Decimal(data.takerAmount).sub("10000000000000000").toFixed();
-    // else  // Ask
-    //     makerAmount = new Decimal(data.makerAmount).sub("10000000000000000").toFixed();
 
     // Bid
     if (data.type == 1)
-        makerAmount = new Decimal(data.makerAmount).add(new Decimal("1").mul(new Decimal(10).pow(Config.token0Dec))).toFixed();
+        makerAmount = new Decimal(data.makerAmount).add(new Decimal("0").mul(new Decimal(10).pow(Config.token0Dec))).toFixed();
     else  // Ask
-        makerAmount = new Decimal(data.makerAmount).add(new Decimal("1").mul(new Decimal(10).pow(Config.token1Dec))).toFixed();
+        makerAmount = new Decimal(data.makerAmount).add(new Decimal("0").mul(new Decimal(10).pow(Config.token1Dec))).toFixed();
 
     try {
         const result = await contract.connect(signer).fillOrderRFQ(
@@ -151,7 +146,7 @@ async function txConfirm(data: any, sender: string) {
             { gasLimit: 1000000 }
         );
 
-        publishMessage("eth-usdt-tx", "transaction_posted", {
+        publishMessage("eth-usdt-tx-1", "transaction_posted", {
             hash: result.hash
         });
 
@@ -171,7 +166,7 @@ async function txConfirm(data: any, sender: string) {
 async function txSuccess(hash: String) {
     $(`#${hash}`).append("<p style=\"color:green\">RFQ Order filled successfully</p>")
 
-    publishMessage("eth-usdt-tx", "transaction_filled", {
+    publishMessage("eth-usdt-tx-1", "transaction_filled", {
         hash: hash
     });
 }
@@ -179,7 +174,7 @@ async function txSuccess(hash: String) {
 async function txFail(hash: String, reason: String) {
     $(`#${hash}`).append("<p style=\"color:red\">Filling RFQ Order failed</p>")
 
-    publishMessage("eth-usdt-tx", "transaction_failed", {
+    publishMessage("eth-usdt-tx-1", "transaction_failed", {
         hash: hash,
         reason: reason
     });

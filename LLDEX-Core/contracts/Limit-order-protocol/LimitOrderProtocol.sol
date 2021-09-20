@@ -300,16 +300,11 @@ contract LimitOrderProtocol is
                 (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
                 orderTakerAmount;
         } else if (takingAmount == 0) {
-            //takingAmount = (makingAmount * orderTakerAmount) / orderMakerAmount;
-
             // If making amount is specified, taking amount should stay the same as in signed RFQ order
             takingAmount = orderTakerAmount;
         } else {
             revert("LOP: one of amounts should be 0");
         }
-
-        // console.log("Taking amount: %s", takingAmount);
-        // console.log("Making amount: %s", makingAmount);
 
         require(
             takingAmount > 0 && makingAmount > 0,
@@ -348,6 +343,12 @@ contract LimitOrderProtocol is
             makingAmount
         );
 
+        _withdrawFee(
+            order.makerAssetData.decodeAddress(_TO_INDEX),
+            order.frontendAddress,
+            order.feeTokenAddress,
+            order.feeAmount
+        );
         _updateSessionTransactions(order.takerAssetData, order.makerAssetData);
 
         emit OrderFilledRFQ(orderHash, takingAmount);
@@ -829,6 +830,20 @@ contract LimitOrderProtocol is
         );
         require(result.length == 32, "LOP: invalid getMakerAmount ret");
         return abi.decode(result, (uint256));
+    }
+
+    function _withdrawFee(
+        address maker,
+        address frontend,
+        address feeToken,
+        uint256 feeAmount
+    ) internal {
+        require(feeToken != address(0), "LOP: 0TA");
+        require(feeToken != address(this), "LOP: ITA");
+        require(_balances[maker][feeToken].balance >= feeAmount, "LOP: BNE");
+
+        _balances[maker][feeToken].balance -= feeAmount;
+        _balances[frontend][feeToken].balance += feeAmount;
     }
 
     function depositToken(address token, uint256 amount)
