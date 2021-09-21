@@ -1,0 +1,36 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">LLDEX</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarColor03" aria-controls="navbarColor03" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="navbar">
+      <div class="navbar-nav me-auto">
+        <div class="bg-danger text-white mx-5 p-2 px-3 rounded-pill btn" *ngIf="!session" >No session</div>
+        <div class="mx-5 p-2 px-3 rounded-pill btn btn-success" *ngIf="session" (click)="op.toggle($event)">
+          Session time left: {{ getCountdown() }}
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+<p-overlayPanel #op>
+  <ng-template pTemplate *ngIf="session">
+    <div class="text-center">Your address</div>
+    <div class="text-center"><strong>{{ address }}</strong></div>
+
+    <div class="text-center mt-3">Session public key</div>
+    <div class="text-center"><strong>{{ sessionPublicKey }}</strong></div>
+
+    <div class="text-center mt-3">Session expiration timestamp</div>
+    <div class="text-center"><strong>{{ expirationTimeStamp }}</strong></div>
+
+    <div class="text-center mt-3">Expires in</div>
+    <div class="text-center"><strong>{{ getCountdown() }}</strong></div>
+
+    <div class="mt-3">
+      <button class="btn btn-danger w-100" (click)="endSession()">Terminate session</button>
+    </div>
+  </ng-template>
+</p-overlayPanel>

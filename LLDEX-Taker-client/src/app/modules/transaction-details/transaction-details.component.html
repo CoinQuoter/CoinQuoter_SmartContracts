@@ -1,0 +1,84 @@
+<app-steps [activeIndex]=1></app-steps>
+<form action="" class="my-4" [formGroup]="form">
+
+  <div class="form-group">
+    <p-dropdown
+      styleClass="form-control"
+      formControlName="currencyPair"
+      [options]="currencies"
+      (onChange)="changePair()"></p-dropdown>
+  </div>
+
+  <div class="row justify-content-center align-items-center py-3">
+    <div class="col-auto">SELL | {{ sell }}</div>
+    <div class="col-auto">
+      <button class="btn btn-primary" (click)="changeCurrencySides()">SWITCH</button>
+    </div>
+    <div class="col-auto">{{ buy }} | BUY</div>
+  </div>
+
+  <div class="row align-items-center my-3 mb-4">
+
+    <div class="col">
+      <div>I sell</div>
+      <p-inputNumber formControlName="sellAmount" [showButtons]="true" [step]="0.001" [min]="0"></p-inputNumber> {{ sell }}
+    </div>
+
+    <div class="col row align-items-center">
+      <div class="col-6">
+        Approved<br/> {{ approveAmount }} {{ sell }}
+        <div class="text-danger">
+          <span *ngIf="this.form.get('sellAmount').hasError('max')">Allowance too low</span>
+          <span>&nbsp;</span>
+        </div>
+      </div>
+      <div class="col-6">
+        <button class="btn btn-primary" [disabled]="!isSession()" (click)="showAllowanceDialog()">Approve {{ sell }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-6">
+
+      <div class="row align-items-center my-4">
+        <div class="col">EHT Balance: <strong>{{ ethBalance }}</strong></div>
+        <div class="col">
+          <button class="btn btn-primary w-100" [disabled]="!isSession()">Wrap ETH</button>
+        </div>
+      </div>
+
+      <div class="row align-items-center mt-4">
+        <div class="col">{{ sell }} Balance: <strong>{{ sellBalance }}</strong></div>
+        <div class="col">
+          <button class="btn btn-primary w-100" [disabled]="!isSession()">Unwrap {{ sell }}</button>
+        </div>
+      </div>
+    </div>
+    <div class="col-6">
+      <div class="row">
+        <div class="col-6 my-4 text-center">
+          <div>Indicative bid</div>
+          <div><strong>{{ bid | number}}</strong></div>
+        </div>
+        <div class="col-6 my-4 text-center">
+          <div>Indicative ask</div>
+          <div><strong>{{ ask | number}}</strong></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-6 text-center">
+          Max Liquidity: 0
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row align-items-center my-4">
+    <div class="col">{{ buy }} Balance: <strong>{{ buyBalance }}</strong></div>
+    <div class="col">
+      <button class="btn btn-primary w-100" (click)="showCreateSessionDialog()" *ngIf="!isSession()" >CREATE SESSION</button>
+      <button class="btn btn-primary w-100" [disabled]="disableQuote()" *ngIf="isSession()" (click)="getQuote()">GET QUOTE</button>
+    </div>
+  </div>
+</form>
+<p-toast></p-toast>

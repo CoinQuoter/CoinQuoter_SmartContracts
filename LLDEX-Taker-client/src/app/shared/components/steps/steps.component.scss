@@ -1,0 +1,12 @@
+.p-steps {
+  .p-steps-item {
+    cursor: pointer;
+    .p-menuitem-link {
+      background-color: #f9f9f9;
+    }
+  }
+  .p-steps-current{
+    opacity: 1;
+  }
+}
+
