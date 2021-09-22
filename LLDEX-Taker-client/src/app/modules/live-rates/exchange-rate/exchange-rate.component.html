@@ -1,0 +1,39 @@
+<div class="bg-white p-3 pb-4 rounded price-info">
+  <div class="d-flex flex-row justify-content-between pb-3 header">
+    <div style="font-weight: 500" class="text-dark currency">{{ connection.title }}</div>
+    <div class="date">SPT({{ today }})</div>
+  </div>
+  <div class="d-flex flex-row justify-content-between">
+    <app-rate-info
+      [price]="sellPrice"
+      title="SELL"
+      [redirect]="getRedirectRoute('sell')"
+      class="col-5 rate py-2 px-4 d-flex"></app-rate-info>
+
+    <div class="col-2 text-center diff-indicator py-1">
+      <div class="p-0 d-flex justify-content-center align-items-end">
+        <img alt="up"
+             src="assets/image/caret-up-green.svg"
+             width="20%"
+             *ngIf="isDifferenceBigger(); else empty" />
+      </div>
+      <div class="difference">{{ difference | number }}</div>
+      <div class="p-0 d-flex justify-content-center align-items-start">
+        <img alt="up"
+             src="assets/image/caret-down-red.svg"
+             width="20%"
+             *ngIf="isDifferenceLower(); else empty" />
+      </div>
+    </div>
+
+    <app-rate-info
+      [price]="buyPrice"
+      title="BUY"
+      [redirect]="getRedirectRoute('buy')"
+      class="col-5 rate py-2 px-4 d-flex"></app-rate-info>
+  </div>
+</div>
+
+<ng-template #empty>
+  &nbsp;
+</ng-template>
