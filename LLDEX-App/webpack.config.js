@@ -4,10 +4,14 @@ const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 
 module.exports = {
     entry: {
-        rt_maker: './src/rt_maker.ts',
-        rt_client: './src/rt_client.ts'
+        //shared: './src/utils/order_decoder.ts',
+        rt_maker: {
+            import: './src/rt_maker.ts',
+            //dependOn: 'shared',
+        },
+        rt_client: './src/rt_client.ts',
     },
-    devtool: 'inline-source-map',
+    devtool: 'source-map',
     module: {
         rules: [
             {
@@ -22,13 +26,8 @@ module.exports = {
         alias: {
             process: "process/browser"
         },
-    },
-    output: {
-        filename: `[name].js`,
-        path: path.resolve(__dirname, 'dist'),
-    },
-    resolve: {
         fallback: {
+            "fs": false,
             "path": require.resolve("path-browserify"),
             "os": require.resolve("os-browserify"),
             "https": require.resolve("https-browserify"),
@@ -36,6 +35,10 @@ module.exports = {
             "crypto": require.resolve("crypto-browserify"),
             "stream": require.resolve("readable-stream")
         }
+    },
+    output: {
+        filename: `[name].js`,
+        path: path.resolve(__dirname, 'dist'),
     },
     plugins: [
         new webpack.ProvidePlugin({

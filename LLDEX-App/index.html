@@ -3,6 +3,8 @@
 
 <head>
   <title>RealTime</title>
+  <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  <link rel="stylesheet" href="/resources/demos/style.css">
 </head>
 
 <style>
@@ -74,13 +76,23 @@
     display: inline;
   }
 
-  #streaming-now-bid-label,
-  #streaming-now-bid {
+  #streaming-now-bid-label-outbound,
+  #streaming-now-bid-outbound {
     display: inline
   }
 
-  #streaming-now-ask-label,
-  #streaming-now-ask {
+  #streaming-now-bid-label-inbound,
+  #streaming-now-bid-inbound {
+    display: inline
+  }
+
+  #streaming-now-ask-label-inbound,
+  #streaming-now-ask-inbound {
+    display: inline
+  }
+
+  #streaming-now-ask-label-outbound,
+  #streaming-now-ask-outbound {
     display: inline
   }
 
@@ -169,18 +181,29 @@
   <div id="price-streaming">
     <div id="stream-control">
       <button id="start-streaming">Start streaming</button>
+
       <div id="streaming-prices-frames">
         <p id="streaming-now-label">Streaming now: </p>
 
-        <p id="streaming-now-bid-label">BID: </p>
-        <p id="streaming-now-bid"></p><br><br>
+        <p id="streaming-now-label-inbound">Inbound: </p>
+        <p id="streaming-now-bid-label-inbound">Bid: </p>
+        <p id="streaming-now-bid-inbound"></p><br>
+        
+        <p id="streaming-now-ask-label-inbound">Ask: </p>
+        <p id="streaming-now-ask-inbound"></p><br>
 
-        <p id="streaming-now-ask-label">ASK: </p>
-        <p id="streaming-now-ask"></p><br>
+        <p id="streaming-now-label-outbound">Outbound: </p>
+        <p id="streaming-now-bid-label-outbound">Bid: </p>
+        <p id="streaming-now-bid-outbound"></p><br>
+
+        <p id="streaming-now-ask-label-outbound">Ask: </p>
+        <p id="streaming-now-ask-outbound"></p><br>
         <div>
+            <p id="slippage-label">Slippage: </p>
+            <input type="number" id="amount-slippage" name="amount-slippage">
           <br>
-          <input type="checkbox" id="auto-accept" name="auto-accept" checked>
-          <label for="auto-accept">Auto accept incoming orders</label>
+            <input type="checkbox" id="auto-accept" name="auto-accept" checked>
+            <label for="auto-accept">Auto accept incoming orders</label>
         </div>
       </div>
     </div>
