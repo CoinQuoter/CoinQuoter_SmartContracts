@@ -1,6 +1,6 @@
 import { Component, Inject, Input, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { WEB3PROVIDER } from '../../../../shared/services/provider.service';
+import { WEB3PROVIDER } from '../../../../shared/services/provider/provider.service';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { BlockchainService } from '../../../../shared/services/blockchain/blockchain.service';
 

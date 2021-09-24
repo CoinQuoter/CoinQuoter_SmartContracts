@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ethers } from 'ethers';
-import { ProviderService } from '../provider.service';
+import { ProviderService } from '../provider/provider.service';
+import { ELocalstorageNames } from '../../enums/localstorage-names.constants';
 
 const lopAddress = "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690";
 const ABILOP: string[] = [
@@ -25,17 +26,16 @@ export class SessionService {
 
 
   async createSession(date: Date) {
-    localStorage.setItem('isSession', date.toString());
     const LOPContract = new ethers.Contract(lopAddress, ABILOP, this.providerService);
     const signer = this.providerService.getSigner(0);
     const wallet = ethers.Wallet.createRandom();
     const expirationTime = Math.round(date.getTime()/1000);
-    console.log(expirationTime)
 
     const result = await LOPContract.connect(signer).createOrUpdateSession(wallet.address, expirationTime);
     await this.providerService.waitForTransaction(result.hash);
 
-    localStorage.setItem('session-taker', JSON.stringify({
+    localStorage.setItem(ELocalstorageNames.SESSION_EXPIRE_TIME, date.toString());
+    localStorage.setItem(ELocalstorageNames.SESSION_TAKER, JSON.stringify({
       session_private_key: wallet.privateKey,
       session_public_key: wallet.address,
       session_creator: await signer.getAddress()
@@ -53,26 +53,24 @@ export class SessionService {
   }
 
   isSession() {
-    if(this.getTimeLeft() < 0) {
-      localStorage.removeItem('isSession');
-      return false;
-    }
-    return true;
+    return this.getTimeLeft() > 0;
   }
 
   getTimeLeft() {
-    return new Date(localStorage.getItem('isSession')).getTime() - new Date().getTime()
+    const time = localStorage.getItem(ELocalstorageNames.SESSION_EXPIRE_TIME);
+    return new Date(time).getTime() - new Date().getTime()
   }
 
   getExpirationTimeStamp() {
-    return localStorage.getItem('isSession');
+    return localStorage.getItem(ELocalstorageNames.SESSION_EXPIRE_TIME);
   }
 
   clearStorage() {
-    localStorage.clear();
+    localStorage.removeItem(ELocalstorageNames.SESSION_EXPIRE_TIME);
+    localStorage.removeItem(ELocalstorageNames.SESSION_TAKER);
   }
 
   getSessionDetails() {
-    return JSON.parse(localStorage.getItem('session-taker'));
+    return JSON.parse(localStorage.getItem(ELocalstorageNames.SESSION_TAKER));
   }
 }

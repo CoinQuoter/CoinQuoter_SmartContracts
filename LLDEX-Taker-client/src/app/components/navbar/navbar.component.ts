@@ -25,6 +25,7 @@ export class NavbarComponent implements OnInit {
         if( this.timeLeft <= 0 ) {
           this.sessionService.clearStorage();
           this.session = false;
+          window.location.reload();
           clearInterval(timer);
         }
       }, 1000);

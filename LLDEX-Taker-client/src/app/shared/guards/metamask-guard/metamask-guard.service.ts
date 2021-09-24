@@ -1,13 +1,13 @@
 import { Inject, Injectable } from '@angular/core';
 import { ActivatedRouteSnapshot, CanActivate, Router, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { Observable } from 'rxjs';
-import { WEB3PROVIDER } from '../provider.service';
-import { BlockchainService } from '../blockchain/blockchain.service';
+import { WEB3PROVIDER } from '../../services/provider/provider.service';
+import { BlockchainService } from '../../services/blockchain/blockchain.service';
 
 @Injectable({
   providedIn: 'root'
 })
-export class AuthGuardService implements CanActivate{
+export class MetamaskGuardService implements CanActivate{
 
   constructor(private blockchainService: BlockchainService,
               private router: Router) { }

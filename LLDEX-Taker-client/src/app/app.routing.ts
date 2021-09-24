@@ -1,7 +1,9 @@
 import { Route } from "@angular/router";
 import { AppComponent } from "./app.component";
-import { AuthGuardService } from './shared/services/auth-guard/auth-guard.service';
-import { SessionGuardService } from './shared/services/session-guard/session-guard.service';
+import { MetamaskGuardService } from './shared/guards/metamask-guard/metamask-guard.service';
+import { SessionGuardService } from './shared/guards/session-guard/session-guard.service';
+import { TradeDataGuardService } from './shared/guards/trade-data-guard/trade-data-guard.service';
+import { ExecutionDataGuardService } from './shared/guards/execution-data-guard/execution-data-guard.service';
 
 export const APP_ROUTES: Route[] = [
   {
@@ -11,11 +13,17 @@ export const APP_ROUTES: Route[] = [
   {
     path: 'transaction-details',
     loadChildren: () => import('./modules/transaction-details/transaction-details.module').then(m => m.TransactionDetailsModule),
-    canActivate: [AuthGuardService]
+    canActivate: [MetamaskGuardService]
   },
   {
     path: 'trade',
     loadChildren: () => import('./modules/trade/trade.module').then(m => m.TradeModule),
-    canActivate: [SessionGuardService]
-  }
+    canActivate: [SessionGuardService, TradeDataGuardService]
+  },
+  {
+    path: 'transaction-status',
+    loadChildren: () => import('./modules/transaction-status/transaction-status.module').then(m => m.TransactionStatusModule),
+    canActivate: [SessionGuardService, TradeDataGuardService, ExecutionDataGuardService]
+  },
+
 ]

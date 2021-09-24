@@ -3,7 +3,7 @@ import { DynamicDialogRef } from 'primeng/dynamicdialog';
 import { FormGroup } from '@angular/forms';
 import { SessionService } from '../../../shared/services/session/session.service';
 import { ethers } from 'ethers';
-import { ProviderService } from '../../../shared/services/provider.service';
+import { ProviderService } from '../../../shared/services/provider/provider.service';
 import { BlockchainService } from '../../../shared/services/blockchain/blockchain.service';
 
 

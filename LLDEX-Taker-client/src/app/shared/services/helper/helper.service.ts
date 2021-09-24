@@ -2,11 +2,14 @@ import { Injectable } from '@angular/core';
 import { ECurrencyPair } from '../../enums/currency-pair.constants';
 import { WETH_DAI } from '../../constants/connections.constants';
 import { ConnectionInfo } from '../../models/connection-info';
+import { BigNumber } from 'ethers';
 
 @Injectable({
   providedIn: 'root'
 })
 export class HelperService {
+
+  accuracy: number;
 
   constructor() { }
 
@@ -22,5 +25,14 @@ export class HelperService {
 
   paramToPair(param: string): string {
     return param.replace("_", "/").toUpperCase();
+  }
+
+  setAccuracy(value: number) {
+    this.accuracy = value;
+  }
+
+  toNumber(value: BigNumber): number{
+    const acc = this.accuracy ?? 0;
+    return Number(value)/Math.pow(10, acc)
   }
 }

@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 
-import { LiveRateService } from './live-rate.service';
+import { TradeDataService } from './trade-data.service';
 
-describe('LiveRateService', () => {
-  let service: LiveRateService;
+describe('TradeDataService', () => {
+  let service: TradeDataService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(LiveRateService);
+    service = TestBed.inject(TradeDataService);
   });
 
   it('should be created', () => {

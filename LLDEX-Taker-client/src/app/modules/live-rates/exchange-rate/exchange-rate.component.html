@@ -5,9 +5,9 @@
   </div>
   <div class="d-flex flex-row justify-content-between">
     <app-rate-info
-      [price]="sellPrice"
+      [price]="bidRate"
       title="SELL"
-      [redirect]="getRedirectRoute('sell')"
+      [redirect]="getRedirectRoute(EBid)"
       class="col-5 rate py-2 px-4 d-flex"></app-rate-info>
 
     <div class="col-2 text-center diff-indicator py-1">
@@ -27,9 +27,9 @@
     </div>
 
     <app-rate-info
-      [price]="buyPrice"
+      [price]="askRate"
       title="BUY"
-      [redirect]="getRedirectRoute('buy')"
+      [redirect]="getRedirectRoute(EAsk)"
       class="col-5 rate py-2 px-4 d-flex"></app-rate-info>
   </div>
 </div>

@@ -1,7 +1,8 @@
 import { Component, Input, OnInit, ViewEncapsulation } from '@angular/core';
-import { LiveRateService } from '../../../shared/services/live-rate/live-rate.service';
+import { PubnubService } from '../../../shared/services/pubnub/pubnub.service';
 import { ConnectionInfo } from '../../../shared/models/connection-info';
 import { DatePipe } from '@angular/common';
+import { EOperationType } from '../../../shared/enums/operation-type.constants';
 
 @Component({
   selector: 'app-exchange-rate',
@@ -14,23 +15,29 @@ export class ExchangeRateComponent implements OnInit {
   @Input() connection: ConnectionInfo;
 
   today: string;
-  sellPrice: number = 13.3562;
-  buyPrice: number = 13.3623;
+  bidRate: number = 13.3562;
+  askRate: number = 13.3623;
   lastDifference: number = 0;
   difference: number = 0;
 
-  constructor(private liveRateService: LiveRateService,
+  EBid: number;
+  EAsk: number;
+
+  constructor(private liveRateService: PubnubService,
               private datePipe: DatePipe) { }
 
   ngOnInit(): void {
     this.today = this.datePipe.transform(new Date(), 'd MMM').toUpperCase();
-    this.liveRateService.getLiveRate(this.connection).addListener({message: event => {
+    this.liveRateService.connect(this.connection).addListener({message: event => {
         this.lastDifference = this.difference;
-        this.sellPrice = event.message.content.data.bid;
-        this.buyPrice = event.message.content.data.ask;
-        this.difference = (this.buyPrice - this.sellPrice)
-          * 10000 / Math.pow(10, Number(this.buyPrice.toString().split('.')[0].length-1));
+        this.bidRate = event.message.content.data.bid;
+        this.askRate = event.message.content.data.ask;
+        this.difference = (this.askRate - this.bidRate)
+          * 10000 / Math.pow(10, Number(this.askRate.toString().split('.')[0].length-1));
       } });
+
+    this.EBid = EOperationType.BID;
+    this.EAsk = EOperationType.ASK;
   }
 
   isDifferenceBigger(): boolean {
@@ -41,7 +48,7 @@ export class ExchangeRateComponent implements OnInit {
     return this.lastDifference > this.difference;
   }
 
-  getRedirectRoute(type: string) {
+  getRedirectRoute(type: number) {
     return { queryParams: {
       pair: this.connection.title.toLowerCase().replace("/", "_"),
       type: type

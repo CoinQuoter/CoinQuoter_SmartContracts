@@ -3,7 +3,6 @@ export interface ConnectionInfo {
   pubNubClient: {
     publishKey: string;
     subscribeKey: string;
-    uuid: string;
   };
   settings: {
     channels: string[];

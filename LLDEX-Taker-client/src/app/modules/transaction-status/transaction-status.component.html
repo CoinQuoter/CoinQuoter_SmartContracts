@@ -1,0 +1,58 @@
+<app-steps [activeIndex]="3"></app-steps>
+<div class="my-4">
+  <div class="header text-center">
+    <h5>{{base}}/{{quote}}</h5>
+  </div>
+  <div class="summary">
+    <h6>Summary</h6>
+    <hr/>
+    <div class="row my-1">
+      <div class="col-5">Trade date</div>
+      <div class="col fw-bold">{{ tradeDate | date: 'MMM d, y, h:mm:ss z'}}</div>
+    </div>
+    <div class="row my-1 align-items-center">
+      <div class="col-5">Status</div>
+      <div class="col fw-bold" [ngClass]="{'text-success' : status == 'Filled', 'text-danger' : status == 'Failed'}">
+        {{status}}
+        <p-progressSpinner *ngIf="status == 'Pending'"
+          strokeWidth="1"
+          [style]="{'height': '25px', 'width' : '25px'}">
+        </p-progressSpinner>
+      </div>
+    </div>
+    <hr/>
+    <div class="row my-2">
+      <div class="col-5">Base currency</div>
+      <div class="col fw-bold">{{base}}</div>
+    </div>
+    <div class="row my-2">
+      <div class="col-5">Quote currency</div>
+      <div class="col fw-bold">{{quote}}</div>
+    </div>
+    <div class="row my-2">
+      <div class="col-5">Request action</div>
+      <div class="col fw-bold">{{action}}</div>
+    </div>
+    <div class="row my-2">
+      <div class="col-5">Indicative bid</div>
+      <div class="col fw-bold">{{bidPrice | number}}</div>
+    </div>
+    <div class="row my-2">
+      <div class="col-5">Indicative ask</div>
+      <div class="col fw-bold">{{askPrice | number}}</div>
+    </div>
+    <div class="row my-2">
+      <div class="col-5">Sell amount</div>
+      <div class="col fw-bold">{{sellAmount}}</div>
+    </div>
+    <div class="row my-2">
+      <div class="col-5">Buy amount</div>
+      <div class="col fw-bold">{{buyAmount | number}}</div>
+    </div>
+  </div>
+  <div class="row justify-content-end">
+    <div class="col-4">
+      <button class="btn btn-success" routerLink="/">Acknowledge</button>
+    </div>
+  </div>
+</div>

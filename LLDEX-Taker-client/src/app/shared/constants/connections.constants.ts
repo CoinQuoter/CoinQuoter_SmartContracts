@@ -7,7 +7,6 @@ export const WETH_DAI: ConnectionInfo = {
   pubNubClient: {
     publishKey: "pub-dd76188a-d8cc-42cf-9625-335ef44bb3a1",
     subscribeKey: "sub-4c298de8-a12e-11e1-bd35-5d12de0b12ad",
-    uuid: PubNub.generateUUID()
   },
   settings: {
     channels: ['eth-usdt-tx'],
