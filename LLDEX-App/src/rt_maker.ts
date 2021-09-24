@@ -527,6 +527,8 @@ function _initBinanceStream(pair: TokenPair) {
         const contentToSend = await _parseStreamMessage(evtJson, pair, streamSnapshot);
         _updatePairWithSnapshot(pair, streamSnapshot);
 
+        console.log(JSON.stringify(contentToSend))
+
         if (streamingPrices) {
             pubnubClient.publish({
                 channel: pair.channelName,
@@ -647,10 +649,10 @@ async function _parseStreamMessage(evtJson: any, pair: TokenPair, streamSnapshot
         bidAmount: _outboundBidWithDec.toString(),
         askAmount: _outboundAskWithDec.toString(),
         makerAddress: makerWalletAddress,
-        token0Address: pair.token0,
-        token1Address: pair.token1,
-        token0Dec: pair.token0Dec,
-        token1Dec: pair.token1Dec,
+        amount0Address: pair.token0,
+        amount1Address: pair.token1,
+        amount0Dec: pair.token0Dec,
+        amount1Dec: pair.token1Dec,
         maxToken0: pair.maxToken0,
         maxToken1: pair.maxToken1,
         contractAddress: Config.limitOrderProtocolAddress

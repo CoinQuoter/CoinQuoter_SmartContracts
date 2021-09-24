@@ -82,8 +82,12 @@ export class TransactionDetailsComponent implements OnInit {
   getBasicContractsInfo() {
     this.connectionInfo = this.getConnectionInfo();
     this.liveRateService.connect(this.connectionInfo).addListener({message: async event => {
+      console.log("PUB MSG");
         if(event.message.content.type == "stream_depth"){
           this.data = event.message.content.data;
+
+          console.log(this.data.amount0Address);
+          console.log(this.data.amount1Address);
 
           const sellTokenContract = this.blockchainService.getERC20Contract(this.data.amount0Address);
           const buyTokenContract = this.blockchainService.getERC20Contract(this.data.amount1Address);

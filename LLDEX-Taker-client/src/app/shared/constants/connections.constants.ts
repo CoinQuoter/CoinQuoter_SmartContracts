@@ -9,7 +9,7 @@ export const WETH_DAI: ConnectionInfo = {
     subscribeKey: "sub-4c298de8-a12e-11e1-bd35-5d12de0b12ad",
   },
   settings: {
-    channels: ['eth-usdt-tx'],
+    channels: ['eth-usdt-1'],
     withPresence: true
   }
 }
