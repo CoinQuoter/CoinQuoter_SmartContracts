@@ -2,15 +2,34 @@
 <html>
 
 <head>
-  <title>RealTime</title>
+  <title>LLDEX Maker Cockpit</title>
   <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-  <link rel="stylesheet" href="/resources/demos/style.css">
 </head>
 
 <style>
   div {
-    margin-top: 8px;
-    margin-bottom: 8px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+  }
+  .inline {
+    display: inline;
+  }
+
+  ol {height:70px;}
+  ol {overflow:hidden; overflow-y:scroll;}
+
+  p {
+    margin: 0px;
+    padding: 0px;
+  }
+
+  .row {
+    display: flex;
+    align-content: flex-start;
+  }
+
+  .column {
+    flex: 50%;
   }
 
   #session-frame,
@@ -119,6 +138,8 @@
   #stream-control {
     flex: 30%;
   }
+
+  .ui-accordion .ui-accordion-content {padding:1em;}
 </style>
 
 <body>
@@ -163,7 +184,7 @@
     <button id="end-session" style="display:none">End session</button>
   </div>
 
-  <div id="approve-token-frame">
+  <!-- <div id="approve-token-frame">
     <div>
       <p id="amount-token0-approved-label">Approved token spending: </p>
       <input type="number" id="amount-token0-approved" name="amount-token0-approved">
@@ -176,9 +197,12 @@
       <p id="amount-token1-approved-label">DAI</p>
       <input id="update-allowance-token1" type="submit" value="Update allowance amount" style="float: right;" />
     </div>
+  </div> -->
+
+  <div id="pairs">
   </div>
 
-  <div id="price-streaming">
+  <!-- <div id="price-streaming">
     <div id="stream-control">
       <button id="start-streaming">Start streaming</button>
 
@@ -207,7 +231,7 @@
         </div>
       </div>
     </div>
-    <pre id="stream-scrollable-feed" style="overflow-y: scroll; max-height:220px;">
+    <pre id="stream-scrollable-feed" style="overflow-y: scroll; max-height:290px;">
 
     </div>
 
@@ -217,7 +241,7 @@
     <pre id="trade-execution-list">
 
     </pre>
-  </div>
+  </div> -->
   <script src="./dist/rt_maker.js"></script>
 </body>
 

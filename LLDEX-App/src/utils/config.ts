@@ -1,5 +1,5 @@
-import Decimal from "decimal.js";
-import { TokenPair } from "../models/token_pair";
+import Decimal from "decimal.js"
+import { TokenPair } from "../models/token_pair"
 
 export default class Config {
     static limitOrderProtocolABI: string[] = [
@@ -8,18 +8,42 @@ export default class Config {
         "function createOrUpdateSession(address sessionKey, uint256 expirationTime) external returns(int256)",
         "function sessionExpirationTime(address owner) external view returns(uint256 expirationTime)",
         "function endSession() external",
-    ];
+        "event OrderFilledRFQ(bytes32 orderHash, uint256 takingAmount)",
+        "event SessionTerminated(address indexed sender, address indexed sessionKey)",
+        "event SessionCreated(address indexed creator, address indexed sessionKey, uint256 expirationTime)",
+        "event SessionUpdated(address indexed sender, address indexed sessionKey, uint256 expirationTime)",
+    ]
 
-    static limitOrderProtocolAddress: string = "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690";
-    static defaultPair: number = 0;
+    static pubNubPublishKey: string = "pub-dd76188a-d8cc-42cf-9625-335ef44bb3a1"
+    static pubNubSubscribeKey: string = "sub-4c298de8-a12e-11e1-bd35-5d12de0b12ad"
+    static limitOrderProtocolAddress: string = "0x8a791620dd6260079bf849dc5567adc3f2fdc318"
+    static fillOrderRFQEstimatedGasUsage: number = 139333
+    
     static pairs: TokenPair[] = [{
-        token0: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-        token1: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
+        token0: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+        token1: "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
         token0Dec: 18,
         token1Dec: 18,
         slippage: new Decimal("0.0005"),
-        spread: new Decimal("0.5"),
+        spreadBid: new Decimal("0.5"),
+        spreadAsk: new Decimal("0.8"),
         maxToken0: new Decimal("10.0"),
-        maxToken1: new Decimal("45000.0"),
-    }];
+        maxToken1: new Decimal("15000.0"),
+        mappingBinance: "ethusdt",
+        channelName: "eth-usdt-1"
+    },
+    {
+        token0: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+        token1: "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+        token0Dec: 18,
+        token1Dec: 18,
+        slippage: new Decimal("0.001"),
+        spreadBid: new Decimal("0.05"),
+        spreadAsk: new Decimal("0.03"),
+        maxToken0: new Decimal("135.0"),
+        maxToken1: new Decimal("5.0"),
+        mappingBinance: "btcusdt",
+        channelName: "btc-usdt-1"
+    }
+]
 }

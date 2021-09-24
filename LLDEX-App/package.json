@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack --mode=production",
-    "build_all": "cd ../limit-order-protocol-utils && npm run build && cd ../LLDEX-Core && npm run compile && cd ../LLDEX-App && npm run build",
+    "build_all": "cd ../limit-order-protocol-utils && npm install && npm run build && cd ../LLDEX-Core && npm install && npm run compile && cd ../LLDEX-App && npm install && npm run build",
     "start": "http-server"
   },
   "keywords": [],
@@ -34,8 +34,10 @@
     "jquery-ui": "^1.12.1",
     "keccak": "^3.0.2",
     "limit-order-protocol-lldex": "file:../limit-order-protocol-utils/dist",
+    "lit": "^2.0.0",
     "lodash": "^4.17.21",
     "madge": "^5.0.1",
+    "node-binance-api": "^0.13.0",
     "os-browserify": "^0.3.0",
     "pubnub": "^4.32.1",
     "readable-stream": "^3.6.0",

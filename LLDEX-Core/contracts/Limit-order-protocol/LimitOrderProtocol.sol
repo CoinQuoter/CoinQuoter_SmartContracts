@@ -284,11 +284,11 @@ contract LimitOrderProtocol is
         returns (SessionStatus)
     {
         _validateSessionKey(sessionKey);
-        require(
-            _sessionOwners[sessionKey] == address(0) ||
-                _sessionOwners[sessionKey] == msg.sender,
-            "LOP: ISO"
-        );
+        // require(
+        //     _sessionOwners[sessionKey] == address(0) ||
+        //         _sessionOwners[sessionKey] == msg.sender,
+        //     "LOP: ISO"
+        // );
         require(expirationTime >= block.timestamp, "LOP: EXP");
 
         // Update current session if session slot exists

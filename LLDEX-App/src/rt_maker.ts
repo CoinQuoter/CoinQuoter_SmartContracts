@@ -1,24 +1,19 @@
 import { BigNumber, Contract, ethers } from "ethers"
+import { OrderType } from "./models/order_type"
+import { BinanceStreamSnapshot } from "./models/binance_stream_snapshot"
+import { TokenPair } from "./models/token_pair";
+import { html, render } from 'lit'
+import { RFQOrder } from "limit-order-protocol-lldex"
+
 import PubNub from "pubnub"
 import Decimal from 'decimal.js'
 import $ from "jquery"
-import "jquery-ui/ui/widgets/dialog";
-import { RFQOrder } from "limit-order-protocol-lldex"
 import OrderDecoder from "./utils/order_decoder"
 import Config from "./utils/config"
-import { OrderType } from "./models/order_type"
-import { BinanceStreamSnapshot } from "./models/binance_stream_snapshot"
 import ERC20ABI from './abi/ERC20ABI.json'
 
-var streamingPrices: boolean = false
-var streamLatestSnapshot: BinanceStreamSnapshot = {
-    bidInbound: new Decimal(0),
-    askInbound: new Decimal(0),
-    bidOutbound: new Decimal(0),
-    askOutbound: new Decimal(0),
-    lastUpdateId: "0",
-}
-const defaultPair = Config.pairs[Config.defaultPair]
+import "jquery-ui/ui/widgets/dialog";
+import "jquery-ui/ui/widgets/accordion";
 
 declare global {
     interface Window {
@@ -30,114 +25,60 @@ interface ConnectInfo {
     chainId: string
 }
 
+var streamLatestSnapshot: Map<string, BinanceStreamSnapshot> = new Map<string, BinanceStreamSnapshot>();
+
 const uuid = PubNub.generateUUID()
-const pubnub = new PubNub({
-    publishKey: "pub-dd76188a-d8cc-42cf-9625-335ef44bb3a1",
-    subscribeKey: "sub-4c298de8-a12e-11e1-bd35-5d12de0b12ad",
+const pubnubClient = new PubNub({
+    publishKey: Config.pubNubPublishKey,
+    subscribeKey: Config.pubNubSubscribeKey,
     uuid: uuid
 })
 
-pubnub.subscribe({
-    channels: ['eth-usdt-tx-1'],
-    withPresence: true
-})
+// const binance = new Binance().options({
+//   APIKEY: BinanceConfig.binanceTestnetAPIKey,
+//   APISECRET: BinanceConfig.binanceTestnetSecretKey,
+// });
 
-pubnub.addListener({
+pubnubClient.addListener({
     message: function (event) {
         const evtData = event.message.content
 
-        if (evtData.type == "action" && evtData.method == "bid_execute") {
-            txConfirm(evtData.data, event.message.sender)
+        if (evtData.type == "action" && evtData.method == "execute_order") {
+            _confirmOrder(evtData.data, event.message.sender, event.channel)
         }
     },
     presence: function (event) {
         let pElement = document.createElement('p')
-        pElement.appendChild(document.createTextNode(event.uuid + " has joined. That's you!"))
+        pElement.appendChild(document.createTextNode(event.uuid + " has joined."))
         document.body.appendChild(pElement)
     }
 })
 
-const conn = new WebSocket("wss://stream.binance.com:9443/ws/ethusdt@depth5@1000ms")
-conn.onopen = function (evt) {
-    console.log("Connected to binance ETH/USDT pricing stream")
-}
-
-conn.onmessage = async function (evt) {
-    if (streamingPrices && !await _validateBalance()) {
-        stopStreamingPrices();
+async function _confirmOrder(data: any, sender: string, channel: string) {
+    const limitOrder = data.limitOrder;
+    const pair: TokenPair = Config.pairs.find(x => {
+        return ((x.token0 === limitOrder.makerAsset.toString() && x.token1 === limitOrder.takerAsset.toString()) || 
+            (x.token0 === limitOrder.takerAsset.toString() && x.token1 === limitOrder.makerAsset.toString())) &&
+            x.channelName == channel.toString()
     }
+    );
 
-    const evtJson = JSON.parse(evt.data)
-
-    const _bidInbound = new Decimal(evtJson.bids[0][0])
-    const _askInbound = new Decimal(evtJson.asks[0][0])
-
-    streamLatestSnapshot = {
-        bidInbound: _bidInbound,
-        askInbound: _askInbound,
-        bidOutbound: _bidInbound.add(defaultPair.spread),
-        askOutbound: _askInbound.add(defaultPair.spread),
-        lastUpdateId: evtJson.lastUpdateId,
-    }
-
-    const _outboundBidWithDec = new Decimal(streamLatestSnapshot.bidOutbound).mul(new Decimal(10).pow(defaultPair.token0Dec))
-    const _outboundAskWithDec = new Decimal(streamLatestSnapshot.askOutbound).mul(new Decimal(10).pow(defaultPair.token1Dec))
-
-    let makerWalletAddress = "0x00"
-
-    try {
-        const provider = new ethers.providers.Web3Provider(window.ethereum)
-        const signer = provider.getSigner(0)
-        makerWalletAddress = await signer.getAddress()
-    } catch (e) { }
-
-    const content_to_send = {
-        lastUpdateId: evtJson.lastUpdateId,
-        bid: streamLatestSnapshot.bidOutbound,
-        ask: streamLatestSnapshot.askOutbound,
-        bidAmount: _outboundBidWithDec.toString(),
-        askAmount: _outboundAskWithDec.toString(),
-        makerAddress: makerWalletAddress,
-        amount0Address: defaultPair.token0,
-        amount1Address: defaultPair.token1,
-        amount0Dec: defaultPair.token0Dec,
-        amount1Dec: defaultPair.token1Dec,
-        contractAddress: Config.limitOrderProtocolAddress
-    }
-
-    $("#streaming-now-bid-inbound").text(streamLatestSnapshot.bidInbound.toString())
-    $("#streaming-now-ask-inbound").text(streamLatestSnapshot.askInbound.toString())
-
-    $("#streaming-now-bid-outbound").text(streamLatestSnapshot.bidOutbound.toString())
-    $("#streaming-now-ask-outbound").text(streamLatestSnapshot.askOutbound.toString())
-
-    if (streamingPrices) {
-        appendPriceToList(content_to_send)
-
-        pubnub.publish({
-            channel: "eth-usdt-tx-1",
-            message: {
-                content: {
-                    type: "stream_depth",
-                    data: content_to_send
-                },
-                sender: uuid
-            },
-            meta: {
-                uuid: pubnub.getUUID()
-            }
+    if (!pair) {
+        publishMessage(channel, "transaction_rejected", {
+            reason: "Maker and taker token does not belong to any available pair"
         })
-    }
-}
 
-async function txConfirm(data: any, sender: string) {
-    console.log(streamingPrices)
+        return
+    }
+    
+    const streamingPrices: boolean = $(`#start-${pair.mappingBinance}`).is(":checked")
+    const autoAccept: boolean = $(`#auto-accept-${pair.mappingBinance}`).is(":checked")
 
     if (!streamingPrices)
         return
 
-    if (!$("#auto-accept").is(':checked')) {
-        const confirmation = window.confirm(`Incoming RFQ fill order from ${sender}.\nType: ${data.type == 1 ? "BID" : "ASK"}\ntaker amount: ${data.takerAmount}\nmaker amount: ${data.makerAmount}`)
+    if (!autoAccept) {
+        const confirmation = window.confirm(`Incoming RFQ fill order from ${sender}.\nType: ${data.type == OrderType.bid ? "BID" : "ASK"}\ntaker amount: ${data.takerAmount}\nmaker amount: ${data.makerAmount}`)
         if (!confirmation)
             return
     }
@@ -155,18 +96,33 @@ async function txConfirm(data: any, sender: string) {
         provider
     )
 
-    let takerAmount = "0"
-    let makerAmount = "0"
+    let takerAmount: string = "0"
+    let makerAmount: string = "0"
+    let makerFeeAmount: Decimal = new Decimal(0);
 
-
-    // Bid
-    if (data.type == 1)
-        makerAmount = new Decimal(data.makerAmount).add(new Decimal("0").mul(new Decimal(10).pow(defaultPair.token0Dec))).toFixed()
-    else  // Ask
-        makerAmount = new Decimal(data.makerAmount).add(new Decimal("0").mul(new Decimal(10).pow(defaultPair.token1Dec))).toFixed()
+    /*
+        Bid order 
+    */
+    if (data.type == OrderType.bid) {
+        makerAmount = new Decimal(data.makerAmount)
+            .add(makerFeeAmount
+                .mul(new Decimal(10)
+                .pow(pair.token0Dec)))
+                .toFixed()
+    }
+    else  {
+    /*
+        Ask order 
+    */
+        makerAmount = new Decimal(data.makerAmount)
+            .add(makerFeeAmount
+                .mul(new Decimal(10)
+                .pow(pair.token1Dec)))
+                .toFixed()
+    }
 
     try {
-        if (!_validateOrder(data.limitOrder)) {
+        if (!_validateOrder(pair, data.limitOrder)) {
             return
         }
 
@@ -178,24 +134,28 @@ async function txConfirm(data: any, sender: string) {
             { gasLimit: 1000000 }
         )
 
-        publishMessage("eth-usdt-tx-1", "transaction_posted", {
+        $(`#${channel}-logs`).append("<li style=\"color:blue\">RFQ Order posted on blockchain</li>")
+
+        publishMessage(pair.channelName, "transaction_posted", {
             hash: result.hash
         })
 
-        appendTransactionToList(data, result.hash)
-
         await provider.waitForTransaction(result.hash)
-        txSuccess(result.hash)
+        txSuccess(pair.channelName, result.hash)
     } catch (err) {
         console.error(err)
+
         if (err.transaction.hash) {
-            appendTransactionToList(data, err.transaction.hash)
-            txFail(err.transaction.hash, err.data?.message ?? '')
+            txFail(
+                pair.channelName, 
+                err.transaction.hash, 
+                err.data?.message ?? ''
+            )
         }
     }
 }
 
-function _validateOrder(order: RFQOrder): boolean {
+function _validateOrder(pair: TokenPair, order: RFQOrder): boolean {
     const orderInfo = OrderDecoder.decodeInfo(order.info)
     const takerAssetData = OrderDecoder.decodeAssetData(order.takerAssetData)
     const makerAssetData = OrderDecoder.decodeAssetData(order.makerAssetData)
@@ -220,39 +180,39 @@ function _validateOrder(order: RFQOrder): boolean {
 
     if (takerAssetData.fromAddress != makerAssetData.toAddress || 
         takerAssetData.toAddress != makerAssetData.fromAddress) {
-        publishMessage("eth-usdt-tx-1", "transaction_rejected", {
+        publishMessage(pair.channelName, "transaction_rejected", {
             reason: "Invalid taker/makerAssetData"
         })
 
         return
     }
 
-    const orderType: OrderType = order.takerAsset == defaultPair.token0 ? OrderType.bid : OrderType.ask
+    const orderType: OrderType = order.takerAsset == pair.token0 ? OrderType.bid : OrderType.ask
     const price = orderType == OrderType.bid ? 
         new Decimal(makerAssetData.amount).div(new Decimal(takerAssetData.amount)) : 
         new Decimal(takerAssetData.amount).div(new Decimal(makerAssetData.amount))
     
     const amountToken0 = (orderType == OrderType.bid ? new Decimal(takerAssetData.amount) : new Decimal(makerAssetData.amount))
         .div(new Decimal(10)
-        .pow(defaultPair.token0Dec))
+        .pow(pair.token0Dec))
 
     const amountToken1 = (orderType == OrderType.bid ? new Decimal(makerAssetData.amount) : new Decimal(takerAssetData.amount))
         .div(new Decimal(10)
-        .pow(defaultPair.token1Dec))
+        .pow(pair.token1Dec))
 
     var _reject: boolean = false
 
-    if (amountToken0.greaterThan(defaultPair.maxToken0)) {
-        publishMessage("eth-usdt-tx-1", "transaction_rejected", {
-            reason: "Max amount of token0 exceeded by " + (amountToken0.sub(defaultPair.maxToken0).toString())
+    if (amountToken0.greaterThan(pair.maxToken0)) {
+        publishMessage(pair.channelName, "transaction_rejected", {
+            reason: "Max amount of token0 exceeded by " + (amountToken0.sub(pair.maxToken0).toString())
         })
 
         _reject = true
     }
 
-    if (amountToken1.greaterThan(defaultPair.maxToken1)) {
-        publishMessage("eth-usdt-tx-1", "transaction_rejected", {
-            reason: "Max amount of token1 exceeded by " + (amountToken1.sub(defaultPair.maxToken1).toString())
+    if (amountToken1.greaterThan(pair.maxToken1)) {
+        publishMessage(pair.channelName, "transaction_rejected", {
+            reason: "Max amount of token1 exceeded by " + (amountToken1.sub(pair.maxToken1).toString())
         })
 
         _reject = true
@@ -263,36 +223,35 @@ function _validateOrder(order: RFQOrder): boolean {
 
     var slippageExceeded = false
     const slippagePercentageBid = price
-        .sub(streamLatestSnapshot.bidOutbound)
-        //.abs()
+        .sub(streamLatestSnapshot.get(pair.mappingBinance).bidOutbound)
         .div(price)
         .mul(100)
 
     const slippagePercentageAsk = price
-        .sub(streamLatestSnapshot.askOutbound)
+        .sub(streamLatestSnapshot.get(pair.mappingBinance).askOutbound)
         .mul(-1)
         .div(price)
         .mul(100)
 
     console.log("Slippage percentage bid: " + slippagePercentageBid)
     console.log("Slippage percentage ask: " + slippagePercentageAsk)
-    console.log("ASK PRICE: " + streamLatestSnapshot.askOutbound)
-    console.log("BID PRICE: " + streamLatestSnapshot.bidOutbound)
+    console.log("ASK PRICE: " + streamLatestSnapshot.get(pair.mappingBinance).askOutbound)
+    console.log("BID PRICE: " + streamLatestSnapshot.get(pair.mappingBinance).bidOutbound)
 
-    if (slippagePercentageBid.greaterThan(defaultPair.slippage) && 
+    if (slippagePercentageBid.greaterThan(pair.slippage) && 
         orderType == OrderType.bid
     ) {
-        publishMessage("eth-usdt-tx-1", "transaction_rejected", {
+        publishMessage(pair.channelName, "transaction_rejected", {
             reason: "Bid - Price exceeded slippage"
         })
 
         slippageExceeded = true
     }
 
-    if (slippagePercentageAsk.greaterThan(defaultPair.slippage) && 
+    if (slippagePercentageAsk.greaterThan(pair.slippage) && 
         orderType == OrderType.ask
     ) {
-        publishMessage("eth-usdt-tx-1", "transaction_rejected", {
+        publishMessage(pair.channelName, "transaction_rejected", {
             reason: "Ask - Price exceeded slippage"
         })
         
@@ -306,25 +265,25 @@ function _validateOrder(order: RFQOrder): boolean {
     return !slippageExceeded
 }
 
-async function txSuccess(hash: String) {
-    $(`#${hash}`).append("<p style=\"color:green\">RFQ Order filled successfully</p>")
+async function txSuccess(channel: string, hash: String) {
+    $(`#${channel}-logs`).append("<li style=\"color:green\">RFQ Order filled successfully</li>")
 
-    publishMessage("eth-usdt-tx-1", "transaction_filled", {
+    publishMessage(channel, "transaction_filled", {
         hash: hash
     })
 }
 
-async function txFail(hash: String, reason: String) {
-    $(`#${hash}`).append("<p style=\"color:red\">Filling RFQ Order failed</p>")
+async function txFail(channel: string, hash: String, reason: String) {
+    $(`#${channel}-logs`).append("<li style=\"color:red\">Filling RFQ Order failed</li>")
 
-    publishMessage("eth-usdt-tx-1", "transaction_failed", {
+    publishMessage(channel, "transaction_failed", {
         hash: hash,
         reason: reason
     })
 }
 
 function publishMessage(channel: string, type: string, data: any) {
-    pubnub.publish({
+    pubnubClient.publish({
         channel: channel,
         message: {
             content: {
@@ -334,9 +293,15 @@ function publishMessage(channel: string, type: string, data: any) {
             sender: uuid
         },
         meta: {
-            uuid: pubnub.getUUID()
+            uuid: pubnubClient.getUUID()
         }
     })
+
+    if (type == "transaction_rejected") {
+        $(`#${channel}-logs`).append(`<li style=\"color:red\">Transaction rejected: ${data.reason}</li>`)
+    }
+
+    $(`#${channel}-logs`).scrollTop($(`#${channel}-logs`)[0].scrollHeight)
 }
 
 
@@ -354,35 +319,11 @@ function appendTransactionToList(data: any, hash: string) {
     $("#trade-execution-list").append(pElement)
 }
 
-function appendPriceToList(data: any) {
-    let pElement = document.createElement('p')
-    pElement.appendChild(document.createTextNode(JSON.stringify({
-        ...data,
-    }, null, 4)))
-
-    $("#stream-scrollable-feed").append(pElement)
-    $("#stream-scrollable-feed").scrollTop($("#stream-scrollable-feed")[0].scrollHeight)
-}
-
 $(document).ready(async function () {
-    $("#end-session").hide()
+    _initializePairs();
+    _initializePubNub();
 
     await updateAccountData()
-
-    $("#streaming-prices-frames").hide()
-    $("#start-streaming").on("click", async function () {
-        if (!streamingPrices && !await _validateBalance()) {
-            return;
-        }
-
-        streamingPrices = !streamingPrices
-
-        if (streamingPrices) {
-           startStreamingPrices();
-        } else {
-            stopStreamingPrices();
-        }
-    })
 
     $("#generate-keyset").on("click", function () {
         generateKeyset()
@@ -412,48 +353,326 @@ $(document).ready(async function () {
         }
     })
 
-    $("#update-allowance-token0").on("click", async function () {
-        const provider = new ethers.providers.Web3Provider(window.ethereum)
-        const token0Contract = new ethers.Contract(defaultPair.token0, ERC20ABI, provider)
-
-        const newAllowance = new Decimal($("#amount-token0-approved").val().toString()).mul(new Decimal(10).pow(defaultPair.token0Dec))
-        await token0Contract.connect(provider.getSigner(0)).approve(Config.limitOrderProtocolAddress, newAllowance.toFixed())
-    })
-
-    $("#update-allowance-token1").on("click", async function () {
-        const provider = new ethers.providers.Web3Provider(window.ethereum)
-        const token0Contract = new ethers.Contract(defaultPair.token1, ERC20ABI, provider)
-
-        const newAllowance = new Decimal($("#amount-token1-approved").val().toString()).mul(new Decimal(10).pow(defaultPair.token1Dec))
-        await token0Contract.connect(provider.getSigner(0)).approve(Config.limitOrderProtocolAddress, newAllowance.toFixed())
-    })
-
     setInterval(function () {
         updateETHBalance()
-        //updateAllowance()
-    }, 1000)
+    }, 5000)
 })
 
-function stopStreamingPrices() {
-    $("#start-streaming").text("Start streaming")
-    $("#streaming-prices-frames").hide()
-
-    streamingPrices = false;
+function _initializePubNub() {
+    pubnubClient.subscribe({
+        channels: Config.pairs.map(x => x.channelName),
+        withPresence: true
+    })
 }
 
-function startStreamingPrices() {
-    $("#start-streaming").text("Stop streaming")
-    $("#streaming-prices-frames").show()
+async function _initializePairs() {
+    for (const pair of Config.pairs) {
+        _appendPair(pair);
+    }
 
-    $("#amount-slippage").val(defaultPair.slippage.toString())
-    $("#amount-slippage").on("change", function () {
-        const slippage = new Decimal($("#amount-slippage").val() + '')
-        console.log("Slippage: " + slippage)
+}
 
-        defaultPair.slippage = new Decimal(slippage)
-    })
+async function _appendPair(pair: TokenPair) {
+    const provider = new ethers.providers.Web3Provider(window.ethereum)
+    const token0Contract = new ethers.Contract(pair.token0, ERC20ABI, provider)
+    const token1Contract = new ethers.Contract(pair.token1, ERC20ABI, provider)
+    const token0Symbol = await token0Contract.symbol();
+    const token1Symbol =  await token1Contract.symbol();
+    const tokenPairName = token0Symbol + " / " + token1Symbol;
 
-    streamingPrices = true;
+    _initBinanceStream(pair);
+
+    const _pair = html`        
+    <div class="accordion">
+        <h3>${tokenPairName}</h3>
+        <div>
+            <div id="controls" style="margin: 0px; padding: 0px;">
+                <fieldset id="${pair.mappingBinance}-streaming-controls">
+                    <legend>Price streaming: </legend>
+                    <label for="start-${pair.mappingBinance}">START</label>
+                        <input type="radio" name="${pair.mappingBinance}" id="start-${pair.mappingBinance}" value="START">
+                    <label for="stop-${pair.mappingBinance}">STOP</label>
+                        <input type="radio" name="${pair.mappingBinance}" id="stop-${pair.mappingBinance}" value="STOP" checked>
+                </fieldset>
+            </div>
+            <div id="${pair.mappingBinance}-stream">
+                <p style="padding-top: 5px;">Streaming now: </p>
+
+                <div class="row" id="${pair.mappingBinance}-stream-prices">
+                    <div id="inbound-prices" class="column">
+                        <h3 style="margin: 0px; padding: 0px;">Inbound: </h3>
+
+                        <div class="row">
+                            <p class="column" id="bid-label-inbound">Bid: </p>
+                            <p class="column" id="${pair.mappingBinance}-bid-inbound">4.2</p>
+                        </div>
+
+                        <div class="row">
+                            <p class="column" id="ask-label-inbound">Ask: </p>
+                            <p class="column" id="${pair.mappingBinance}-ask-inbound">7.5</p>
+                        </div>
+                    </div>
+
+                    <div id="outbound-prices" class="column">
+                        <h3 style="margin: 0px; padding: 0px;">Outbound: </h3>
+
+                        <div class="row">
+                            <p class="column" id="bid-label-outbound">Bid: </p>
+                            <p class="column" id="${pair.mappingBinance}-bid-outbound">2.5</p>
+                        </div>
+
+                        <div class="row">
+                            <p class="column" id="ask-label-outbound">Ask: </p>
+                            <p class="column" id="${pair.mappingBinance}-ask-outbound">3.2</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="column" style="padding-top: 10px;">
+                    <div>
+                        <p style="display:inline;">Bid spread: </p>
+                            <input type="number" id="${pair.mappingBinance}-bid-spread" name="${pair.mappingBinance}-bid-spread" value="${pair.spreadBid}"><br>
+                    </div>
+                    <div>
+                        <p style="display:inline;">Ask spread: </p>
+                            <input type="number" id="${pair.mappingBinance}-ask-spread" name="${pair.mappingBinance}-ask-spread" value="${pair.spreadAsk}"><br>
+                    </div>
+                    <div>
+                        <p style="display:inline;">Slippage in %: </p>
+                            <input type="number" id="${pair.mappingBinance}-slippage" name="${pair.mappingBinance}-slippage" value="${pair.slippage}">
+                    </div>
+                </div>
+                <div class="column">
+                    <div id="${pair.mappingBinance}-allowance" style="padding-top: 10px;">
+                        <p style="display:inline">Allowance: </p>
+                            <input type="number" id="${pair.mappingBinance}-amount-token0-approved" name="${pair.mappingBinance}-amount-token0-approved">
+                        <p style="display:inline">${token0Symbol}</p>
+                            <input id="${pair.mappingBinance}-update-allowance-token0" type="submit" value="Approve" style="float: right;" />
+                    </div>
+                    <div>
+                        <p style="display:inline">Allowance: </p>
+                            <input type="number" id="${pair.mappingBinance}-amount-token1-approved" name="${pair.mappingBinance}-amount-token1-approved">
+                        <p style="display:inline">${token1Symbol}</p>
+                            <input id="${pair.mappingBinance}-update-allowance-token1" type="submit" value="Approve" style="float: right;" />
+                    </div>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="row">
+                <div class="column" style="padding-top: 10px;">
+                    <div>
+                        <p style="display:inline;">Max ${token0Symbol} per trade: </p>
+                            <input type="number" id="${pair.mappingBinance}-max-token0" name="${pair.mappingBinance}-max-token0" value="${pair.maxToken0}">
+                        <p style="display:inline; padding-left: 5px;">${token0Symbol} balance: </p>
+                        <p style="display:inline;" id="${pair.mappingBinance}-balance-token0">-</p><br>
+                    </div>
+                    <div>
+                        <p style="display:inline;">Max ${token1Symbol} per trade: </p>
+                            <input type="number" id="${pair.mappingBinance}-max-token1" name="${pair.mappingBinance}-max-token1" value="${pair.maxToken1}">
+                        <p style="display:inline; padding-left: 5px;">${token1Symbol} balance: </p>
+                        <p style="display:inline;" id="${pair.mappingBinance}-balance-token1">-</p><br>
+                    </div>
+                    <div>
+                        <p style="display:inline;">Gas fee in ${token0Symbol} : </p>
+                        <p style="display:inline;" id="${pair.mappingBinance}-gas-fee">-</p><br>
+                    </div>
+                </div>
+                <div style="flex: 30%;">
+                    <ol id="${pair.channelName}-logs">
+                    </ol>
+                </div>
+            </div>
+            <div class="row">
+                <input type="checkbox" id="auto-accept-${pair.mappingBinance}" name="auto-accept-${pair.mappingBinance}" checked>
+                <label for="auto-accept-${pair.mappingBinance}">Auto accept incoming orders</label>
+            </div>
+
+        </div>
+    </div>`;
+    
+    const divRender = document.createElement('div');
+    render(_pair, divRender);
+ 
+    $("#pairs").append(divRender)
+    $(".accordion").accordion({collapsible: true, active: false, heightStyle: 'content'});
+    $(`#${pair.mappingBinance}-stream`).hide();
+
+    _attachEventsToPair(pair);
+    _updateAllowanceData(pair);
+    _updateBalanceData(pair);
+}
+
+function _initBinanceStream(pair: TokenPair) {
+    const streamBNB = new WebSocket(`wss://stream.binance.com:9443/ws/${pair.mappingBinance}@depth5@1000ms`)
+    streamBNB.onopen = function (_) {
+        console.log(`Connected to binance ${pair.mappingBinance} pricing stream`)
+    }
+
+    streamBNB.onmessage = async function (evt) {
+        const streamingPrices: boolean = $(`#start-${pair.mappingBinance}`).is(":checked")
+
+        if (streamingPrices && !await _validateBalance(pair)) {
+            _stopStreamingPrices(pair);
+
+            return;
+        }
+
+        const evtJson = JSON.parse(evt.data)
+
+        const streamSnapshot = _convertMessageToSnapshot(evtJson, pair);
+        const contentToSend = await _parseStreamMessage(evtJson, pair, streamSnapshot);
+        _updatePairWithSnapshot(pair, streamSnapshot);
+
+        if (streamingPrices) {
+            pubnubClient.publish({
+                channel: pair.channelName,
+                message: {
+                    content: {
+                        type: "stream_depth",
+                        data: contentToSend
+                    },
+                    sender: uuid
+                },
+                meta: {
+                    uuid: pubnubClient.getUUID()
+                }
+            })
+        }
+    }
+}
+
+function _attachEventsToPair(pair: TokenPair) {
+    $(`#start-${pair.mappingBinance}`).on("change", async function(value) {
+        if (!await _validateBalance(pair)) {
+            _stopStreamingPrices(pair);
+
+            return;
+        }
+
+        $(`#${pair.mappingBinance}-stream`).show();
+    });
+
+    $(`#stop-${pair.mappingBinance}`).on("change", async function(value) {
+        _stopStreamingPrices(pair);
+    });
+
+    $(`#${pair.mappingBinance}-bid-spread`).on("change", function () {
+        const spread = new Decimal($(`#${pair.mappingBinance}-bid-spread`).val() + '')
+
+        pair.spreadBid = new Decimal(spread);
+    });
+
+    $(`#${pair.mappingBinance}-ask-spread`).on("change", function () {
+        const spread = new Decimal($(`#${pair.mappingBinance}-ask-spread`).val() + '')
+
+        pair.spreadAsk = new Decimal(spread);
+    });
+
+    $(`#${pair.mappingBinance}-slippage`).on("change", function () {
+        const slippage = new Decimal($(`#${pair.mappingBinance}-slippage`).val() + '')
+
+        pair.slippage = new Decimal(slippage);
+    });
+
+    $(`#${pair.mappingBinance}-max-token0`).on("change", function () {
+        const maxToken0 = new Decimal($(`#${pair.mappingBinance}-max-token0`).val() + '')
+
+        pair.maxToken0 = new Decimal(maxToken0);
+    });
+
+    $(`#${pair.mappingBinance}-max-token1`).on("change", function () {
+        const maxToken1 = new Decimal($(`#${pair.mappingBinance}-max-token1`).val() + '')
+
+        pair.maxToken1 = new Decimal(maxToken1);
+    });
+
+    $(`#${pair.mappingBinance}-update-allowance-token0`).on("click", async function() {
+        const provider = new ethers.providers.Web3Provider(window.ethereum)
+        const token0Contract = new ethers.Contract(pair.token0, ERC20ABI, provider)
+
+        const newAllowance = new Decimal($(`#${pair.mappingBinance}-amount-token0-approved`).val().toString()).mul(new Decimal(10).pow(pair.token0Dec))
+        const result = await token0Contract.connect(provider.getSigner(0)).approve(Config.limitOrderProtocolAddress, newAllowance.toFixed())
+        await provider.waitForTransaction(result.hash);
+
+        Config.pairs.forEach(x => _updateAllowanceData(x));
+    });
+
+    $(`#${pair.mappingBinance}-update-allowance-token1`).on("click", async function() {
+        const provider = new ethers.providers.Web3Provider(window.ethereum)
+        const token1Contract = new ethers.Contract(pair.token1, ERC20ABI, provider)
+
+        const newAllowance = new Decimal($(`#${pair.mappingBinance}-amount-token1-approved`).val().toString()).mul(new Decimal(10).pow(pair.token1Dec))
+        const result = await token1Contract.connect(provider.getSigner(0)).approve(Config.limitOrderProtocolAddress, newAllowance.toFixed())
+        await provider.waitForTransaction(result.hash);
+
+        Config.pairs.forEach(x => _updateAllowanceData(x));
+    });
+}
+
+function _convertMessageToSnapshot(evtJson: any, pair: TokenPair): BinanceStreamSnapshot {
+    const _bidInbound = new Decimal(evtJson.bids[0][0])
+    const _askInbound = new Decimal(evtJson.asks[0][0])
+
+    const streamSnapshot = {
+        bidInbound: _bidInbound,
+        askInbound: _askInbound,
+        bidOutbound: _bidInbound.sub(pair.spreadBid),
+        askOutbound: _askInbound.add(pair.spreadAsk),
+        lastUpdateId: evtJson.lastUpdateId,
+    }
+
+    return streamSnapshot;
+}
+
+async function _parseStreamMessage(evtJson: any, pair: TokenPair, streamSnapshot: BinanceStreamSnapshot) {
+    const _outboundBidWithDec = new Decimal(streamSnapshot.bidOutbound).mul(new Decimal(10).pow(pair.token0Dec))
+    const _outboundAskWithDec = new Decimal(streamSnapshot.askOutbound).mul(new Decimal(10).pow(pair.token1Dec))
+
+    let makerWalletAddress = "0x00"
+
+    try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum)
+        const signer = provider.getSigner(0)
+        makerWalletAddress = await signer.getAddress()
+    } catch (e) { }
+
+    const contentToSend = {
+        lastUpdateId: evtJson.lastUpdateId,
+        bid: streamSnapshot.bidOutbound,
+        ask: streamSnapshot.askOutbound,
+        bidAmount: _outboundBidWithDec.toString(),
+        askAmount: _outboundAskWithDec.toString(),
+        makerAddress: makerWalletAddress,
+        token0Address: pair.token0,
+        token1Address: pair.token1,
+        token0Dec: pair.token0Dec,
+        token1Dec: pair.token1Dec,
+        maxToken0: pair.maxToken0,
+        maxToken1: pair.maxToken1,
+        contractAddress: Config.limitOrderProtocolAddress
+    }
+
+    return contentToSend;
+}
+
+function _updatePairWithSnapshot(pair: TokenPair, streamSnapshot: BinanceStreamSnapshot) {
+    $(`#${pair.mappingBinance}-bid-inbound`).text(streamSnapshot.bidInbound.toString())
+    $(`#${pair.mappingBinance}-ask-inbound`).text(streamSnapshot.askInbound.toString())
+    $(`#${pair.mappingBinance}-bid-outbound`).text(streamSnapshot.bidOutbound.toString())
+    $(`#${pair.mappingBinance}-ask-outbound`).text(streamSnapshot.askOutbound.toString())
+
+    streamLatestSnapshot.set(pair.mappingBinance, streamSnapshot);
+}
+
+function _stopStreamingPrices(pair: TokenPair) {
+    $(`#start-${pair.mappingBinance}`).prop('checked', false);
+    $(`#stop-${pair.mappingBinance}`).prop('checked', true);
+
+    $(`#${pair.mappingBinance}-stream`).hide();
 }
 
 
@@ -465,27 +684,58 @@ function copyToClipboard(text: string) {
     $temp.remove()
 }
 
-async function updateAllowance() {
+async function _updateBalanceData(pair: TokenPair) {
     const provider = new ethers.providers.Web3Provider(window.ethereum)
-    const tokenContract0 = new ethers.Contract(defaultPair.token0, ERC20ABI, provider)
-    const tokenContract1 = new ethers.Contract(defaultPair.token1, ERC20ABI, provider)
+    const tokenContract0 = new ethers.Contract(pair.token0, ERC20ABI, provider)
+    const tokenContract1 = new ethers.Contract(pair.token1, ERC20ABI, provider)
 
-    const takerAddress = await provider.getSigner(0).getAddress()
-    const allowanceToken0 = new Decimal((await tokenContract0
-        .connect(takerAddress)
-        .allowance(takerAddress, Config.limitOrderProtocolAddress))
+    const makerAddress = await provider.getSigner(0).getAddress()
+    const balanceToken0 = new Decimal((await tokenContract0
+        .connect(makerAddress)
+        .balanceOf(makerAddress))
         .toString())
-        .div(new Decimal(10).pow(defaultPair.token0Dec))
+        .div(new Decimal(10).pow(pair.token0Dec))
+        
+    const balanceToken1 = new Decimal((await tokenContract1
+        .connect(makerAddress)
+        .balanceOf(makerAddress))
+        .toString())
+        .div(new Decimal(10).pow(pair.token1Dec))
+    
+    const gasPrice: BigNumber = await provider.getGasPrice();
+    const transactionGasFee: Decimal = new Decimal(gasPrice.toString())
+        .mul(Config.fillOrderRFQEstimatedGasUsage)
+        .div(new Decimal(10)
+            .pow(pair.token0Dec));
+
+    $(`#${pair.mappingBinance}-balance-token0`).text(balanceToken0.toFixed(8))
+    $(`#${pair.mappingBinance}-balance-token1`).text(balanceToken1.toFixed(8))
+    $(`#${pair.mappingBinance}-gas-fee`).text(transactionGasFee.toFixed(8));
+}
+
+async function _updateAllowanceData(pair: TokenPair) {
+    const provider = new ethers.providers.Web3Provider(window.ethereum)
+    const tokenContract0 = new ethers.Contract(pair.token0, ERC20ABI, provider)
+    const tokenContract1 = new ethers.Contract(pair.token1, ERC20ABI, provider)
+
+    const makerAddress = await provider.getSigner(0).getAddress()
+    const allowanceToken0 = new Decimal((await tokenContract0
+        .connect(makerAddress)
+        .allowance(makerAddress, Config.limitOrderProtocolAddress))
+        .toString())
+        .div(new Decimal(10).pow(pair.token0Dec))
         
     const allowanceToken1 = new Decimal((await tokenContract1
-        .connect(takerAddress)
-        .allowance(takerAddress, Config.limitOrderProtocolAddress))
+        .connect(makerAddress)
+        .allowance(makerAddress, Config.limitOrderProtocolAddress))
         .toString())
-        .div(new Decimal(10).pow(defaultPair.token1Dec))
+        .div(new Decimal(10).pow(pair.token1Dec))
 
-    $("#amount-token0-approved").val(allowanceToken0.toFixed(8))
-    $("#amount-token1-approved").val(allowanceToken1.toFixed(8))
+    if (!$(`#${pair.mappingBinance}-amount-token0-approved`).is(":focus"))
+        $(`#${pair.mappingBinance}-amount-token0-approved`).val(allowanceToken0.toFixed(8))
 
+    if (!$(`#${pair.mappingBinance}-amount-token1-approved`).is(":focus"))
+        $(`#${pair.mappingBinance}-amount-token1-approved`).val(allowanceToken1.toFixed(8))
 }
 
 async function privateKeyToPublic(privateKey: string) {
@@ -517,15 +767,15 @@ async function generateKeyset(privateKey?: string) {
     updatePublicKey()
 }
 
-async function _validateBalance(): Promise<boolean> {
+async function _validateBalance(pair: TokenPair): Promise<boolean> {
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     const signerAddress = await provider.getSigner(0).getAddress()
 
-    const tokenContract0 = new ethers.Contract(defaultPair.token0, ERC20ABI, provider)
-    const tokenContract1 = new ethers.Contract(defaultPair.token1, ERC20ABI, provider)
+    const tokenContract0 = new ethers.Contract(pair.token0, ERC20ABI, provider)
+    const tokenContract1 = new ethers.Contract(pair.token1, ERC20ABI, provider)
 
-    const maxToken0 = BigNumber.from(defaultPair.maxToken0.toString()).mul(BigNumber.from(10).pow(defaultPair.token0Dec))
-    const maxToken1 = BigNumber.from(defaultPair.maxToken1.toString()).mul(BigNumber.from(10).pow(defaultPair.token1Dec))
+    const maxToken0 = BigNumber.from(pair.maxToken0.mul(new Decimal(10).pow(pair.token0Dec)).toFixed(0))
+    const maxToken1 = BigNumber.from(pair.maxToken1.mul(new Decimal(10).pow(pair.token1Dec)).toFixed(0))
 
     const token0Balance = await tokenContract0.balanceOf(signerAddress)
     const token1Balance = await tokenContract1.balanceOf(signerAddress)
@@ -596,8 +846,6 @@ async function createSession() {
 async function updateAccountData() {
     const provider = new ethers.providers.Web3Provider(window.ethereum)
 
-    console.log("ABCD: " + localStorage.getItem('session-maker') != null)
-
     if (localStorage.getItem('session-maker') != null) {
         const session = JSON.parse(localStorage.getItem('session-maker'))
 
@@ -619,7 +867,7 @@ async function updateAccountData() {
 
     updatePublicKey()
     updateETHBalance()
-    updateAllowance()
+    //updateAllowance()
 
     try {
         const signer = provider.getSigner(0)
@@ -641,6 +889,10 @@ async function updateETHBalance() {
     } else {
         $("#sender-session-balance").text("No private key")
     }
+
+    Config.pairs.forEach(x => {
+        _updateBalanceData(x)
+    });
 }
 
 async function endSession() {
