@@ -1,8 +1,8 @@
 import { LimitOrderBuilder, LimitOrderPredicateBuilder, LimitOrderPredicateCallData, LimitOrderProtocolFacade, PrivateKeyProviderConnector } from "limit-order-protocol-lldex";
-import * as PubNub from "pubnub";
+import PubNub from "pubnub";
 import Web3 from "web3"
 import Decimal from 'decimal.js';
-import * as $ from "jquery";
+import $ from "jquery";
 import { ethers } from "ethers";
 
 let allowanceFetched = false;
@@ -125,7 +125,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
 
 
     pubnub_client.subscribe({
-        channels: ['eth-usdt-tx'],
+        channels: ['eth-usdt-tx-1'],
         withPresence: true
     });
 
@@ -145,6 +145,8 @@ window.addEventListener('DOMContentLoaded', (event) => {
                 $('#tx-status').append(`<p style=\"color:green\"> [${evtData.data.hash}] RFQ Order filled successfully</p>`)
             } else if (evtData.type == "transaction_failed") {
                 $('#tx-status').append(`<p style=\"color:red\"> [${evtData.data.hash}] Filling RFQ Order failed (reason: ${evtData.data.reason})</p>`)
+            } else if (evtData.type == "transaction_rejected") {
+                $('#tx-status').append(`<p style=\"color:red\"> [-] Filling RFQ Order failed - order rejected (reason: ${evtData.data.reason})</p>`)
             }
         },
         presence: function (event) {
@@ -203,14 +205,16 @@ window.addEventListener('DOMContentLoaded', (event) => {
         } else {
             amountOutput.value = (Number(amountInput.value) * Number(data.bid)).toString();
 
-            amountIn = new Decimal(amountInput.value).mul(new Decimal(10).pow(data.amount0Dec)).toFixed();
-            amountOut = new Decimal(amountOutput.value).mul(new Decimal(10).pow(data.amount1Dec)).toFixed();
+            amountIn = new Decimal(amountInput.value).mul(new Decimal(10).pow(data.amount0Dec))/*.sub("10000000000000")*/.toFixed();
+            amountOut = new Decimal(amountOutput.value).mul(new Decimal(10).pow(data.amount1Dec))/*.add("10000000000000000")*/.toFixed();
             takerAssetAddres = data.amount0Address;
             makerAssetAddres = data.amount1Address;
         }
 
         var array = new Uint32Array(1);
         window.crypto.getRandomValues(array);
+
+        console.log("Order id: " + array[0]);
 
         const limitOrder = limitOrderBuilder.buildRFQOrder({
             id: array[0],
@@ -248,7 +252,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
             return;
 
         pubnub_client.publish({
-            channel: "eth-usdt-tx",
+            channel: "eth-usdt-tx-1",
             message: {
                 content: {
                     type: "action",

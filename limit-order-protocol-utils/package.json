@@ -10,7 +10,7 @@
         "directory": "@1inch/limit-order-protocol"
     },
     "scripts": {
-        "prebuild": "rm -rf dist && yarn run test:coverage && yarn run make-badges",
+        "prebuild": "rm -rf dist",
         "build": "tsc --module commonjs",
         "postbuild": "cp package.json dist && cp README.md dist && cp -R docs dist && chmod +x dist/utils/limit-order-rfq.utils.js",
         "lint": "eslint ./src --ext .js,.ts",
