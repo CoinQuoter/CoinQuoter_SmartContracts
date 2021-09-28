@@ -16,35 +16,75 @@ export default class Config {
 
     static pubNubPublishKey: string = "pub-dd76188a-d8cc-42cf-9625-335ef44bb3a1"
     static pubNubSubscribeKey: string = "sub-4c298de8-a12e-11e1-bd35-5d12de0b12ad"
-    static limitOrderProtocolAddress: string = "0x8a791620dd6260079bf849dc5567adc3f2fdc318"
+    static limitOrderProtocolAddress: string = "0xbFE71f56Fd7670BBB2C76A44067d633F1B44F765"
     static fillOrderRFQEstimatedGasUsage: number = 139333
     static signWithPrivateKey: boolean = true;
     
-    static pairs: TokenPair[] = [{
-        token0: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
-        token1: "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
-        token0Dec: 18,
-        token1Dec: 18,
+    static pairs: TokenPair[] = [
+    {
+        token0: "0xcf664087a5bb0237a0bad6742852ec6c8d69a27a",
+        token1: "0x3c2b8be99c50593081eaa2a724f0b8285f5aba8f",
+        token0Dec: 0,
+        token1Dec: 0,
         slippage: new Decimal("0.0005"),
-        spreadBid: new Decimal("0.5"),
-        spreadAsk: new Decimal("0.7"),
+        spreadBid: new Decimal("0.005"),
+        spreadAsk: new Decimal("0.004"),
         maxToken0: new Decimal("10.0"),
         maxToken1: new Decimal("15000.0"),
-        mappingBinance: "bnbusdt",
-        channelName: "eth-usdt-1"
+        mappingBinance: "oneusdt",
+        channelName: "one-usdt-2"
     },
     {
-        token0: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
-        token1: "0x5fbdb2315678afecb367f032d93f642f64180aa3",
-        token0Dec: 18,
-        token1Dec: 18,
+        token0: "0xcf664087a5bb0237a0bad6742852ec6c8d69a27a",
+        token1: "0x3095c7557bcb296ccc6e363de01b760ba031f2d9",
+        token0Dec: 0,
+        token1Dec: 0,
+        slippage: new Decimal("0.001"),
+        spreadBid: new Decimal("0.000000004"),
+        spreadAsk: new Decimal("0.000000008"),
+        maxToken0: new Decimal("135.0"),
+        maxToken1: new Decimal("5.0"),
+        mappingBinance: "onebtc",
+        channelName: "one-btc-2"
+    },
+    {
+        token0: "0x6983d1e6def3690c4d616b13597a09e6193ea013",
+        token1: "0x3095c7557bcb296ccc6e363de01b760ba031f2d9",
+        token0Dec: 0,
+        token1Dec: 0,
+        slippage: new Decimal("0.001"),
+        spreadBid: new Decimal("0.00005"),
+        spreadAsk: new Decimal("0.00003"),
+        maxToken0: new Decimal("135.0"),
+        maxToken1: new Decimal("5.0"),
+        mappingBinance: "ethbtc",
+        channelName: "eth-btc-2"
+    },
+    {
+        token0: "0x6983d1e6def3690c4d616b13597a09e6193ea013",
+        token1: "0x3c2b8be99c50593081eaa2a724f0b8285f5aba8f",
+        token0Dec: 0,
+        token1Dec: 0,
+        slippage: new Decimal("0.001"),
+        spreadBid: new Decimal("0.05"),
+        spreadAsk: new Decimal("0.03"),
+        maxToken0: new Decimal("135.0"),
+        maxToken1: new Decimal("5.0"),
+        mappingBinance: "ethusdt",
+        channelName: "eth-usdt-2"
+    },
+    {
+        token0: "0x3095c7557bcb296ccc6e363de01b760ba031f2d9",
+        token1: "0x3c2b8be99c50593081eaa2a724f0b8285f5aba8f",
+        token0Dec: 0,
+        token1Dec: 0,
         slippage: new Decimal("0.001"),
         spreadBid: new Decimal("0.05"),
         spreadAsk: new Decimal("0.03"),
         maxToken0: new Decimal("135.0"),
         maxToken1: new Decimal("5.0"),
         mappingBinance: "btcusdt",
-        channelName: "btc-usdt-1"
+        channelName: "btc-usdt-2"
     }
 ]
 }

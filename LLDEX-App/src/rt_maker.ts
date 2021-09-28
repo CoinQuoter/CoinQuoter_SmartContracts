@@ -114,7 +114,7 @@ async function _confirmOrder(data: SignedLimitOrder, sender: string, channel: st
                 .pow(pair.token0Dec)))
                 .toFixed()
 
-        makerAmount = new Decimal(data.makerAmount).add('1000000000000000').toFixed()
+        // makerAmount = new Decimal(data.makerAmount).add('1000000000000000').toFixed()
     }
     else  {
     /*
@@ -501,7 +501,9 @@ $(document).ready(async function () {
 
     setInterval(async function() {
         Config.pairs.forEach(async function(pair) {
-            if (!await _validateBalance(pair)) {
+            const streamingPrices: boolean = $(`#start-${pair.mappingBinance}`).is(':checked')
+
+            if (streamingPrices && !await _validateBalance(pair)) {
                 _stopStreamingPrices(pair);
 
                 return;
@@ -543,9 +545,8 @@ function _initializePubNub() {
 
 async function _initializePairs() {
     for (const pair of Config.pairs) {
-        _appendPair(pair);
+        await _appendPair(pair);
     }
-
 }
 
 async function _appendPair(pair: TokenPair) {
@@ -554,7 +555,12 @@ async function _appendPair(pair: TokenPair) {
     const token1Contract = new ethers.Contract(pair.token1, ERC20ABI, provider)
     const token0Symbol = await token0Contract.symbol();
     const token1Symbol =  await token1Contract.symbol();
+    const token0Decimals = await token0Contract.decimals();
+    const token1Decimals =  await token1Contract.decimals();
     const tokenPairName = token0Symbol + ' / ' + token1Symbol;
+
+    pair.token0Dec = token0Decimals
+    pair.token1Dec = token1Decimals
 
     provider.pollingInterval = 1;
 
@@ -671,9 +677,9 @@ async function _appendPair(pair: TokenPair) {
                     <label for='auto-hedge-${pair.mappingBinance}'>Auto hedge with binance</label>
                 </div>
 
-                <div class='column'>
+                <!-- <div class='column'>
                     <input id='print-binance-balance' type='submit' value='Print binance balance' style='float: right;' />
-                </div>
+                </div> -->
             </div>
             <div class='row' style='padding-top: 12px'>
                 <p style='display:inline;'>Deal blotter: </p><br>

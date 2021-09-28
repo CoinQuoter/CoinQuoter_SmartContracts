@@ -130,7 +130,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
 
 
     pubnub_client.subscribe({
-        channels: ['eth-usdt-2'],
+        channels: ['one-usdt-2'],
         withPresence: true
     });
 
@@ -267,7 +267,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
             return;
 
         pubnub_client.publish({
-            channel: "eth-usdt-2",
+            channel: "one-usdt-2",
             message: {
                 content: {
                     type: "action",
