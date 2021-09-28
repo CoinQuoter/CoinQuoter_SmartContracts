@@ -16,7 +16,7 @@ export default class Config {
 
     static pubNubPublishKey: string = "pub-dd76188a-d8cc-42cf-9625-335ef44bb3a1"
     static pubNubSubscribeKey: string = "sub-4c298de8-a12e-11e1-bd35-5d12de0b12ad"
-    static limitOrderProtocolAddress: string = "0xbFE71f56Fd7670BBB2C76A44067d633F1B44F765"
+    static limitOrderProtocolAddress: string = "0x8a791620dd6260079bf849dc5567adc3f2fdc318"
     static fillOrderRFQEstimatedGasUsage: number = 139333
     static signWithPrivateKey: boolean = true;
     
@@ -31,7 +31,7 @@ export default class Config {
         maxToken0: new Decimal("10.0"),
         maxToken1: new Decimal("15000.0"),
         mappingBinance: "bnbusdt",
-        channelName: "eth-usdt-2"
+        channelName: "eth-usdt-1"
     },
     {
         token0: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
