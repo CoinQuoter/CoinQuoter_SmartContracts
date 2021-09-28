@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>LLDEX Taker Cockpit</title>
+  <title>RealTime</title>
 </head>
 
 <style>
@@ -89,8 +89,8 @@
   <div>
     <label for="token-sell">Sell token: </label>
     <select name="token-sell" id="token-sell">
-      <!-- <option value="WETH">WETH</option>
-      <option value="DAI">DAI</option> -->
+      <option value="WETH">WETH</option>
+      <option value="DAI">DAI</option>
     </select><br>
 
     <div>
@@ -104,8 +104,8 @@
 
     <label for="token-buy">Buy token: </label>
     <select name="token-buy" id="token-buy">
-      <!-- <option value="WETH">WETH</option>
-      <option selected value="DAI">DAI</option> -->
+      <option value="WETH">WETH</option>
+      <option selected value="DAI">DAI</option>
     </select>
 
     <div>
@@ -117,6 +117,9 @@
 
   <label for="private-key">Private Key:</label>
   <input type="text" id="private-key" name="private-key"><br><br>
+
+  <input type="checkbox" id="sign-with-private-key" name="sign-with-private-key" checked>
+  <label for="sign-with-private-key">Sign with private key</label><br><br>
 
   <input id="bid-button" type="submit" data-price="" data-lastUpdateId="" value="BID:" />
   <input id="ask-button" type="submit" data-price="" data-lastUpdateId="" value="ASK:" />

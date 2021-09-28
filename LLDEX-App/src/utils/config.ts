@@ -8,7 +8,7 @@ export default class Config {
         "function createOrUpdateSession(address sessionKey, uint256 expirationTime) external returns(int256)",
         "function sessionExpirationTime(address owner) external view returns(uint256 expirationTime)",
         "function endSession() external",
-        "event OrderFilledRFQ(bytes32 orderHash, uint256 takingAmount)",
+        "event OrderFilledRFQ(bytes32 orderHash, uint256 takingAmount, uint256 makingAmount)",
         "event SessionTerminated(address indexed sender, address indexed sessionKey)",
         "event SessionCreated(address indexed creator, address indexed sessionKey, uint256 expirationTime)",
         "event SessionUpdated(address indexed sender, address indexed sessionKey, uint256 expirationTime)",
@@ -16,8 +16,9 @@ export default class Config {
 
     static pubNubPublishKey: string = "pub-dd76188a-d8cc-42cf-9625-335ef44bb3a1"
     static pubNubSubscribeKey: string = "sub-4c298de8-a12e-11e1-bd35-5d12de0b12ad"
-    static limitOrderProtocolAddress: string = "0x8a791620dd6260079bf849dc5567adc3f2fdc318"
+    static limitOrderProtocolAddress: string = "0xbFE71f56Fd7670BBB2C76A44067d633F1B44F765"
     static fillOrderRFQEstimatedGasUsage: number = 139333
+    static signWithPrivateKey: boolean = true;
     
     static pairs: TokenPair[] = [{
         token0: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
@@ -26,11 +27,11 @@ export default class Config {
         token1Dec: 18,
         slippage: new Decimal("0.0005"),
         spreadBid: new Decimal("0.5"),
-        spreadAsk: new Decimal("0.8"),
+        spreadAsk: new Decimal("0.7"),
         maxToken0: new Decimal("10.0"),
         maxToken1: new Decimal("15000.0"),
-        mappingBinance: "ethusdt",
-        channelName: "eth-usdt-1"
+        mappingBinance: "bnbusdt",
+        channelName: "eth-usdt-2"
     },
     {
         token0: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",

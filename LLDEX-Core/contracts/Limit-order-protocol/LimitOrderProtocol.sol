@@ -6,6 +6,7 @@ import "@openzeppelin/contracts_v42/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts_v42/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts_v42/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts_v42/token/ERC20/extensions/draft-ERC20Permit.sol";
+import "@openzeppelin/contracts_v42/utils/cryptography/SignatureChecker.sol";
 
 import "./helpers/AmountCalculator.sol";
 import "./helpers/ChainlinkCalculator.sol";
@@ -38,25 +39,25 @@ contract LimitOrderProtocol is
     using UncheckedAddress for address;
     using ArgumentsDecoder for bytes;
 
-    modifier sessionNotExpired(OrderRFQ memory order) {
-        // Require taker session to be valid, ie. not expired
-        address taker = order.takerAssetData.decodeAddress(_FROM_INDEX);
-        require(
-            _sessions[taker].expirationTime >= block.timestamp,
-            "LOP: EXP MAKER"
-        );
-
+    modifier makerSessionNotExpired(
+        OrderRFQ memory order,
+        bytes memory signature
+    ) {
         // Require maker session to be valid, ie. not expired
         address maker = order.makerAssetData.decodeAddress(_FROM_INDEX);
         require(
-            _sessions[maker].expirationTime >= block.timestamp,
-            "LOP: EXP TAKER"
+            _sessions[maker].expirationTime > block.timestamp,
+            "LOP: EXP MAKER"
         );
 
         _;
     }
 
-    event OrderFilledRFQ(bytes32 orderHash, uint256 takingAmount);
+    event OrderFilledRFQ(
+        bytes32 orderHash,
+        uint256 takingAmount,
+        uint256 makingAmount
+    );
 
     struct OrderRFQ {
         uint256 info;
@@ -93,8 +94,6 @@ contract LimitOrderProtocol is
     mapping(address => mapping(address => Balance)) private _balances;
     // Mapping of session owner to session
     mapping(address => Session) private _sessions;
-    // Mapping of session public key to session owner
-    mapping(address => address) private _sessionOwners;
 
     // solhint-disable-next-line func-name-mixedcase
     function DOMAIN_SEPARATOR() external view returns (bytes32) {
@@ -151,7 +150,11 @@ contract LimitOrderProtocol is
         bytes calldata signature,
         uint256 takingAmount,
         uint256 makingAmount
-    ) external sessionNotExpired(order) returns (uint256, uint256) {
+    )
+        external
+        makerSessionNotExpired(order, signature)
+        returns (uint256, uint256)
+    {
         return
             fillOrderRFQTo(
                 order,
@@ -213,18 +216,27 @@ contract LimitOrderProtocol is
         uint256 orderMakerAmount = order.makerAssetData.decodeUint256(
             _AMOUNT_INDEX
         );
+
         if (makingAmount == 0 && takingAmount == 0) {
             // Two zeros means whole order
             takingAmount = orderTakerAmount;
             makingAmount = orderMakerAmount;
+        } else if (
+            takingAmount != 0 &&
+            (makingAmount >
+                (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
+                    orderTakerAmount)
+        ) {
+            // Partial fill with positive slippage
         } else if (makingAmount == 0) {
             makingAmount =
                 (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
                 orderTakerAmount;
-        } else if (takingAmount == 0) {
-            // If making amount is specified, taking amount should stay the same as in signed RFQ order
-            takingAmount = orderTakerAmount;
-        } else {
+        }
+        // else if (takingAmount == 0) {
+        //     //takingAmount = (makingAmount * orderTakerAmount) / orderMakerAmount;
+        // }
+        else {
             revert("LOP: one of amounts should be 0");
         }
 
@@ -237,11 +249,40 @@ contract LimitOrderProtocol is
             "LOP: taking amount exceeded"
         );
 
+        // require(
+        //     makingAmount <= orderMakerAmount,
+        //     "LOP: making amount exceeded"
+        // );
+
+        // if (makingAmount == 0 && takingAmount == 0) {
+        //     // Two zeros means whole order
+        //     takingAmount = orderTakerAmount;
+        //     makingAmount = orderMakerAmount;
+        // } else if (makingAmount == 0) {
+        //     makingAmount =
+        //         (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
+        //         orderTakerAmount;
+        // } else if (takingAmount == 0) {
+        //     // If making amount is specified, taking amount should stay the same as in signed RFQ order
+        //     takingAmount = orderTakerAmount;
+        // } else {
+        //     revert("LOP: one of amounts should be 0");
+        // }
+
+        // require(
+        //     takingAmount > 0 && makingAmount > 0,
+        //     "LOP: can't swap 0 amount"
+        // );
+        // require(
+        //     takingAmount <= orderTakerAmount,
+        //     "LOP: taking amount exceeded"
+        // );
+
         // Let maker make transaction for bigger quote than order makingAmount
-        require(
-            makingAmount >= orderMakerAmount,
-            "LOP: making amount exceeded"
-        );
+        // require(
+        //     makingAmount >= orderMakerAmount,
+        //     "LOP: making amount exceeded"
+        // );
 
         // Validate order
         bytes32 orderHash = _hash(order);
@@ -252,28 +293,32 @@ contract LimitOrderProtocol is
             orderHash
         );
 
-        // Taker => Maker, Maker => Taker
+        // Transfer Taker => Maker
         _callTakerAssetTransferFrom(
             order.takerAsset,
             order.takerAssetData,
             target,
             takingAmount
         );
+
+        // Transfer Maker => Taker
         _callMakerAssetTransferFrom(
             order.makerAsset,
             order.makerAssetData,
             makingAmount
         );
 
+        // Withdraw fee
         _withdrawFee(
             order.makerAssetData.decodeAddress(_TO_INDEX),
             order.frontendAddress,
             order.feeTokenAddress,
             order.feeAmount
         );
+
         _updateSessionTransactions(order.takerAssetData, order.makerAssetData);
 
-        emit OrderFilledRFQ(orderHash, takingAmount);
+        emit OrderFilledRFQ(orderHash, takingAmount, makingAmount);
         return (takingAmount, makingAmount);
     }
 
@@ -284,11 +329,6 @@ contract LimitOrderProtocol is
         returns (SessionStatus)
     {
         _validateSessionKey(sessionKey);
-        // require(
-        //     _sessionOwners[sessionKey] == address(0) ||
-        //         _sessionOwners[sessionKey] == msg.sender,
-        //     "LOP: ISO"
-        // );
         require(expirationTime >= block.timestamp, "LOP: EXP");
 
         // Update current session if session slot exists
@@ -298,8 +338,6 @@ contract LimitOrderProtocol is
             // Update session key if its different from the storage key
             if (_sessions[msg.sender].sessionKey != sessionKey) {
                 _sessions[msg.sender].sessionKey = sessionKey;
-
-                _sessionOwners[sessionKey] = msg.sender;
             }
 
             emit SessionUpdated(
@@ -316,8 +354,6 @@ contract LimitOrderProtocol is
                 expirationTime: expirationTime,
                 txCount: 0
             });
-
-            _sessionOwners[sessionKey] = msg.sender;
 
             emit SessionCreated(
                 msg.sender,
@@ -427,28 +463,53 @@ contract LimitOrderProtocol is
             "LOP: bad makerAssetData.selector"
         );
 
-        address taker = _sessions[
-            address(takerAssetData.decodeAddress(_FROM_INDEX))
-        ].sessionKey;
-        if (
-            (signature.length != 65 && signature.length != 64) ||
-            SilentECDSA.recover(orderHash, signature) != taker
-        ) {
-            bytes memory result = taker.uncheckedFunctionStaticCall(
-                abi.encodeWithSelector(
-                    IERC1271.isValidSignature.selector,
+        address taker = address(takerAssetData.decodeAddress(_FROM_INDEX));
+        if (_sessions[taker].expirationTime > block.timestamp) {
+            // Session not expired
+
+            require(
+                SignatureChecker.isValidSignatureNow(
+                    _sessions[taker].sessionKey,
                     orderHash,
                     signature
                 ),
-                "LOP: isValidSignature failed"
+                "LOP: bad signature"
             );
+        } else {
+            // Sesssion is expired
+
             require(
-                result.length == 32 &&
-                    abi.decode(result, (bytes4)) ==
-                    IERC1271.isValidSignature.selector,
+                SignatureChecker.isValidSignatureNow(
+                    taker,
+                    orderHash,
+                    signature
+                ),
                 "LOP: bad signature"
             );
         }
+
+        // address taker = _sessions[
+        //     address(takerAssetData.decodeAddress(_FROM_INDEX))
+        // ].sessionKey;
+        // if (
+        //     (signature.length != 65 && signature.length != 64) ||
+        //     SilentECDSA.recover(orderHash, signature) != taker
+        // ) {
+        //     bytes memory result = taker.uncheckedFunctionStaticCall(
+        //         abi.encodeWithSelector(
+        //             IERC1271.isValidSignature.selector,
+        //             orderHash,
+        //             signature
+        //         ),
+        //         "LOP: isValidSignature failed"
+        //     );
+        //     require(
+        //         result.length == 32 &&
+        //             abi.decode(result, (bytes4)) ==
+        //             IERC1271.isValidSignature.selector,
+        //         "LOP: bad signature"
+        //     );
+        // }
     }
 
     function _callTakerAssetTransferFrom(
@@ -466,8 +527,13 @@ contract LimitOrderProtocol is
                 "LOP: private order"
             );
         }
+
         if (orderMakerAddress != maker) {
-            takerAssetData.patchAddress(_TO_INDEX, _sessionOwners[msg.sender]);
+            takerAssetData.patchAddress(
+                _TO_INDEX,
+                /*_sessionOwners[msg.sender]*/
+                orderMakerAddress
+            );
         }
 
         // Patch taker amount
@@ -497,8 +563,14 @@ contract LimitOrderProtocol is
         bytes memory makerAssetData,
         uint256 makingAmount
     ) private {
-        // Patch spender
-        makerAssetData.patchAddress(_FROM_INDEX, _sessionOwners[msg.sender]);
+        address orderMakerAddress = makerAssetData.decodeAddress(_FROM_INDEX);
+
+        if (orderMakerAddress != address(0)) {
+            require(
+                msg.sender == _sessions[orderMakerAddress].sessionKey,
+                "LOP: private order"
+            );
+        }
 
         // Patch maker amount
         makerAssetData.patchUint256(_AMOUNT_INDEX, makingAmount);
@@ -575,7 +647,6 @@ contract LimitOrderProtocol is
     {
         require(token != address(0), "LOP: 0TA");
         require(token != address(this), "LOP: ITA");
-        require(_sessionOwners[msg.sender] == address(0), "LOP: SKW");
         require(amount > 0, "LOP: 0A");
         require(_balances[msg.sender][token].balance >= amount, "LOP: BNE");
 

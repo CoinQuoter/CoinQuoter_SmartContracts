@@ -15,8 +15,21 @@
     display: inline;
   }
 
-  ol {height:70px;}
-  ol {overflow:hidden; overflow-y:scroll;}
+  table {
+    font-family: arial, sans-serif;
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  td, th {
+    border: 1px solid #d4d4d4;
+    text-align: left;
+    padding: 5px;
+  }
+
+  tr:nth-child(even) {
+    background-color: #d4d4d4;
+  }
 
   p {
     margin: 0px;
