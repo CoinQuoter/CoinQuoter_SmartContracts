@@ -57,12 +57,9 @@ Who we are looking for:
 * Professional Market Makers that would be willing to work with us on the creation of a dedicated Single Market Maker portal
 * DeFI experts that would be willing to spread the concept across the industry
 
-Connect with us on social media to stay up to date with all our
+Connect with us on social media to stay up to date:
 
-* Medium
-* Discord
-* Twitter
-* Telegram \(community\) \(announcements\)
-
+* [Twitter](https://twitter.com/kamilchels)
+* [Discord](https://discord.gg/UjBjFmVa)
 
 
