@@ -7,8 +7,8 @@ Full documentation of the project can be found on: https://lldex.gitbook.io/llde
 Demo video: .....
 
 Connect with us on social media to stay up to date:
-Twitter
-Discord
+* [Twitter](https://twitter.com/kamilchels)
+* [Discord](https://discord.gg/UjBjFmVa)
 
 # What is LLDEX?
 
