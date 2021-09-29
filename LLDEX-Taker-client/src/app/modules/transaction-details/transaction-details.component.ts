@@ -49,6 +49,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   pubnubClient: any;
   gasPrice: number;
   blockButton: boolean;
+  maxLiquidity: number;
 
   constructor(private formBuilder: FormBuilder,
               @Inject(WEB3PROVIDER) private web3Provider,
@@ -83,6 +84,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
     this.askRate = 0;
     this.sellBalance = 0;
     this.gasPrice = 0;
+    this.maxLiquidity = 0;
 
     this.blockButton = true;
     this.allowanceDisplay = false;
@@ -109,6 +111,12 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
             const sellTokenContract = this.blockchainService.getERC20Contract(this.data.amount0Address);
             const buyTokenContract = this.blockchainService.getERC20Contract(this.data.amount1Address);
             const currentContact = this.isOperationAsk() ? buyTokenContract : sellTokenContract;
+
+            this.maxLiquidity = this.isOperationAsk() ? this.data.maxToken0 : this.data.maxToken1;
+
+            this.maxLiquidity = this.isOperationAsk() ? (this.maxLiquidity * this.data.bid)*0.99 : (this.maxLiquidity/this.data.ask)*0.99;
+            console.log(this.maxLiquidity);
+
             this.approveAmount = this.helperService.toNumber(
               await this.blockchainService.getAllowanceAmount(currentContact, this.data.contractAddress)
             );
@@ -126,7 +134,8 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
           formSellAmount.setValidators([
             Validators.required,
             this.allowanceValidator(this.approveAmount),
-            this.sellTokenBalanceValidator(sellTokenBalance)])
+            this.sellTokenBalanceValidator(sellTokenBalance),
+            this.liquidityValidator(this.maxLiquidity)])
         }
         }
     });
@@ -233,6 +242,10 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
 
   allowanceValidator(allowance: number): ValidatorFn {
     return this.exceededValidator(allowance, 'allowance');
+  }
+
+  liquidityValidator(liquitidy: number): ValidatorFn {
+    return this.exceededValidator(liquitidy, 'liquidity');
   }
 
   private exceededValidator(max: number, keyName: string): ValidatorFn {

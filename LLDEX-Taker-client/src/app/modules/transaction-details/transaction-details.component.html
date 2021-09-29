@@ -150,6 +150,10 @@
                  formControlName="sellAmount">
           <div class="text-right w-1/5 pr-3 font-bold">{{sellToken}}</div>
         </div>
+        <div class="text-sm font-semibold text-red-800 py-1">
+          <div *ngIf="form.controls.sellAmount.hasError('sellTokenBalance')">Balance exceeded</div>
+          <div *ngIf="form.controls.sellAmount.hasError('liquidity')">Max available liquidity: {{ maxLiquidity.toFixed(8) }} {{sellToken}}</div>
+        </div>
       </div>
 
       <div class="flex justify-between text-sm mb-2">
