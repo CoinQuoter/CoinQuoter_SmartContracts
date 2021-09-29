@@ -1,6 +1,7 @@
 # LLDEX
 Low Latency DEX
 This project is a Harmony Hackathon project: https://gitcoin.co/hackathon/harmony-defi/projects/9385/low-latency-p2p-dex
+Design of LLDEX allows for a very good integration with Hummingbot, but due to limited resources we just to finish on a core leaving integration for a latter stages.
 
 Full documentation of the project can be found on: https://lldex.gitbook.io/lldex/
 
