@@ -6,6 +6,10 @@ Full documentation of the project can be found on: https://lldex.gitbook.io/llde
 
 Demo video: .....
 
+Connect with us on social media to stay up to date:
+Twitter
+Discord
+
 # What is LLDEX?
 
 ### Low Latency DEX Protocol
