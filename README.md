@@ -1,40 +1,64 @@
 # LLDEX
 Low Latency DEX
-
 This project is done as a Harmony Hackathon project: https://gitcoin.co/hackathon/harmony-defi/projects/9385/low-latency-p2p-dex
 
-90% of trades on the interbank market are done between market makers and market takers that have some sort of relationship with each other. Order Book-style trading is relatively limited because there are very few market participants that know where the real market is in a particular millisecond. Market Makers aggregate feeds from multiple sources and offer prices to the end customers. Thanks to "last look" Market Makers are able to check if the market price that they quoted has not changed to much. During the last look Market Makers can auto-hedge flow before giving final confirmation to the end customer. Every big market taker has just 5-7 very good market makers (having more would have a negative impact on the price).  Smaller market takers usually just use single bank portals to trade FX. Thanks to this structure bid-ask spread on OTC FX SPOT/FX Forward/FX SWAP is &lt; 0.001% on the most traded pairs.  
+# What is LLDEX?
 
-With most crypto volume happening on CEX, flow on DEX platform is mostly related to arbitrage. To confirm, you play around with our P&amp;L report of LPs on Uniswap v3: https://dune.xyz/queries/101811 - in most cases LPs would be better off, not providing liquidity to Uniswap v3 and just keep the initial ratio of tokens that they put in because Fees are smaller than loss related to the change in token ratio. From our perspective, long term it makes sense to provide liquidity to DEX only on pairs, where a particular DEX is a primary market for a particular instrument or at least if arbitrage flow is smaller than real client flow. 
+### Low Latency DEX Protocol
 
-Our interbank experience is telling us, that even Harmony finally of 2 sec, if not enough to make on-chain DEX a leading market for most trades crypto pairs. With growing knowledge on the market about the profitability of market-making strategies on AMMs like Uniswap, it might be that liquidity on these platforms will slowly diminish. 
+Low Latency DEX is a permissionless protocol to settle crypto trades between 2 counterparties \(Wallet2Wallet trading\).
 
-Taking all the above into account there is a need for a new type of blockchain-based trading.
+The framework allows counterparties to agree on the price off-chain in a low latency environment and settle the trade on-chain. Thanks to the Last Look workflow market makers have a chance to auto-hedge client flow on other chains \(cross-chain\) or on low latency centralized exchanges. This makes liquidity independent from TVL. 
 
-One of the solutions that we see in the long-run, is a split between the low-latency price discovery from the blockchain-based settlement. This would bring back the blockchain role to the one it was initially designed for (a double-spending problem for digital currencies described by Satoshi Nakamoto)
+#### 🤝 General workflow
 
-General Solution Architecture: 
-- Front-end needs to be run and managed by a particular market maker/aggregator of market makers/DAOs (legal disclamers can be taken from: https://liquity.org/)
-- Market maker/price aggregator is streaming a price via WebSocket/WebRTC/https://docs.ethswarm.org/docs/dapps-on-swarm/pss to the end client 
-getting pricing from CEXes via Hummingbot aggregation
-- End client is confirming the order and sending the execution request to the market maker with a validity time of ... seconds (dependent on average blockchain finality and last look time needed for particular market maker)
-- When the market taker is requesting a price, that no longer available, market maker is able to reject the trade
-- During last look window, the market maker is able to auto hedge client order via Hummingbot 
-- When the trade is confirmed the MARKET MAKER is sending the trade to the blockchain for settlement. 
-- Market maker can also fill the trade with a price that is better than what the client has clicked (positive slippage) 
-- In most cases, all trades should be profitable for the market maker, but it can sometimes take a small loss to decrease rejection ratio statistics for a given front-end 
+1. Market Maker is streaming prices to Market Taker
+2. Market Taker is sending Execution Request to Market Maker
+3. Maker Maker is sending trade to the blockchain for trade settlement
 
-The general idea of how to do combine on and off-chain workflow for the above solution can be taken of 1inch limit order protocol. To achieve the smallest possible latency between market taker sending execution requests and market maker sending trade to the blockchain for settlement, there is a need for some additional authorization workflow on both ends. To achive decentralization, front-ends should be run IPFS/ethswarm.org style hosting.
+To allow **low latency** execution workflow between 2 parties without compromising security, we implemented an additional key set on the market taker and on the market maker side. Information about keys used for low latency workflows is saved on the blockchain.
 
-Problems to solve:
-- How to do marketing of the project (stage 1: get 1-3 market makers that would have a lot of capital on chain and on CEX, stage 2: get retail customers)
-- How to measure the performance of the market maker, if the page is run by market maker
-- How front-end should be hosted/managed in the decentralized way
-- How to do marketing (maybe market makers can take over???)
-- How to enable Wallet2Wallet trading using third party feeds (ex. retail client is streaming pricing directly to other retail client via websocket/WebRTC) -> in particular how to prevent DOS style attacts what would flod the system with low quality quotes/quotes that would be always rejected
+#### 🤝 Market Maker
 
-Roadmap:
-- Stage 1: bring above to the market
-- Stage 2: create real-time FX SWAP alternative on crypto and enable 20x leverage for on-chain trades -> decrease capital usage for market makers (they can then work on margin on CEX and DEX) - > every FX SPOT trade can be combined with FX SWAP -> this would give 20x leverage for market makers willing to move liqudity from CEX to DEX
+Rates streamed by Market Maker do not commit the Market Maker to execute a particular quote \(this is not firm liquidity\). It is up to the Market Maker to decide if the Execution Request sent by Market Taker should be sent to the blockchain for settlement.
 
-If you would like to join the project, connect with me via discord: kamilchels#5658
+LLDEX workflow is allowing an almost risk-free position to auto-hedging of any incoming execution request on any platform. Auto-hedging can be performed between receiving an Execution Request from Market Taker and sending the transaction to the blockchain for settlement. If the hedge trade would not be possible at the given price, Market Maker can reject the execution request \(last-look\). Market Makers is paying gas for the trade. The cost associated with gas should be included in the price. Price without gas cost can be shown in a separate field on the client screen \(particularly important in the case of small trades on expensive networks like Etherum\).
+
+Market Maker should take care of the latency between the server that is streaming the price and the end client. Market Maker has full control over its reputation. Constant trade rejections will cause reputation damage.
+
+To achieve low latency execution, Market Maker has a special key set \(session account\) stored in the browser or any other software that is responsible for trade confirmation. Session account is pushing trades to the blockchain for settlement, so it should hold money that would cover gas costs.
+
+#### 👨‍🌾 Market Takers
+
+Market Taker is getting current prices from Market Maker. Market Taker is sending the execution request to the Market Maker with validity time. Validity time should be dependent on the finality time of a given blockchain and the maximum value of last look time that the Market Taker would give to a particular Market Maker.
+
+To achieve low latency execution, Market Taker has a session key stored in the browser. Information about the session key is stored on the blockchain. Session key has validity time. The concept is taken from a regular authorization standard used by companies like Amazon, Google, Facebook.
+
+Execution request is a data structure created off-chain \(ex. in the browser\) and signed according to [EIP-712](https://eips.ethereum.org/EIPS/eip-712) by the valid session key.
+
+### Why we built Low Latency DEX Protocol
+
+Most of the Crypto volumes are one on specialized Centralized Regulated Exchanges \(CEX\) like Binance, Hobi, Coinbase, FTX and [others](https://coinmarketcap.com/rankings/exchanges/). This is in contradiction with the main idea behind cryptocurrencies: DECENTRALIZATION.
+
+[Decentralized Exchanges](https://coinmarketcap.com/rankings/exchanges/dex/) \(DEX\) are now trying very hard to change it, but they are still a long way behind CEX. To help bring more Crypto volume that settles directly on-chain, we decided to copy the last-look workflow from OTC market and create LLDEX concept.
+
+We hope that our work will be used by market makers that will be able to offer OTC liquidity that is settled on-chain. The other use of this concept would be multi-market maker platforms that would aggregate, manage and provide tools for market makers as an alternative for providing liquidity on platforms like Uniswap/PancakeSwap/SushiSwap etc.
+
+### Stay Connected
+
+Who we are looking for:
+
+* Market Takers that would be willing to trade using real-time prices from hundreds if not thousands of market makers and settle trades on-chain.
+* Market Makers that are holding funds on and off-chain and would be willing to pass liquidity from Centralized Exchanges to on-chain Market Takes with use of newly created tools
+* Professional Market Makers that would be willing to work with us on the creation of a dedicated Single Market Maker portal
+* DeFI experts that would be willing to spread the concept across the industry
+
+Connect with us on social media to stay up to date with all our
+
+* Medium
+* Discord
+* Twitter
+* Telegram \(community\) \(announcements\)
+
+
+
