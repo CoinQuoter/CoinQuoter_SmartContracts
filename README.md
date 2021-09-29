@@ -2,6 +2,10 @@
 Low Latency DEX
 This project is done as a Harmony Hackathon project: https://gitcoin.co/hackathon/harmony-defi/projects/9385/low-latency-p2p-dex
 
+Full documentation of the project can be found on: https://lldex.gitbook.io/lldex/
+
+Demo video: .....
+
 # What is LLDEX?
 
 ### Low Latency DEX Protocol
