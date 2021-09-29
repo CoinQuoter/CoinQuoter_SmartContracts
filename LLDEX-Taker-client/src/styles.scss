@@ -1,6 +1,17 @@
-@import "../node_modules/bootswatch/dist/litera/_variables.scss";
-@import "../node_modules/bootstrap/scss/bootstrap.scss";
-@import "../node_modules/bootswatch/dist/litera/_bootswatch.scss";
-@import "../node_modules/bootswatch/dist/litera/bootstrap.min.css";
+//@import "../node_modules/bootswatch/dist/litera/_variables.scss";
+//@import "../node_modules/bootstrap/scss/bootstrap.scss";
+//@import "../node_modules/bootswatch/dist/litera/_bootswatch.scss";
+//@import "../node_modules/bootswatch/dist/litera/bootstrap.min.css";
 
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;600;700;800;900&display=swap');
 
+* {
+  font-family: 'Nunito', sans-serif;
+}
+
+.btn-primary {
+  @apply py-1.5 px-8 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-default
+}

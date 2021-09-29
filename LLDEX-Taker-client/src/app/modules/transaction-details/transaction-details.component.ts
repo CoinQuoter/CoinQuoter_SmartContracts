@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import { ECurrencyPair } from '../../shared/enums/currency-pair.constants';
 import { AbstractControl, FormBuilder, FormGroup, ValidatorFn, Validators } from '@angular/forms';
 import { ProviderService, WEB3PROVIDER } from '../../shared/services/provider/provider.service';
@@ -9,18 +9,19 @@ import { PubnubService } from '../../shared/services/pubnub/pubnub.service';
 import { ConnectionInfo } from '../../shared/models/connection-info';
 import { BigNumber, ethers } from 'ethers';
 import { BlockchainService } from '../../shared/services/blockchain/blockchain.service';
-import { CreateSessionDialogComponent } from './create-session-dialog/create-session-dialog.component';
+import { CreateSessionDialogComponent } from '../../shared/components/create-session-dialog/create-session-dialog.component';
 import { SessionService } from '../../shared/services/session/session.service';
 import { HelperService } from '../../shared/services/helper/helper.service';
 import { EOperationType } from '../../shared/enums/operation-type.constants';
 import { TradeDataService } from '../../shared/services/trade-data/trade-data.service';
+import { FILLORDER_RFQ_ESTIMATED_GAS_USAGE } from '../../shared/constants/config.constants';
 
 @Component({
   selector: 'app-transaction-details',
   templateUrl: './transaction-details.component.html',
   styleUrls: ['./transaction-details.component.css']
 })
-export class TransactionDetailsComponent implements OnInit {
+export class TransactionDetailsComponent implements OnInit, OnDestroy {
 
   data: any;
 
@@ -44,6 +45,10 @@ export class TransactionDetailsComponent implements OnInit {
   bidRate: number;
   askRate: number;
   sellAmount: number;
+  sellBalance: number;
+  pubnubClient: any;
+  gasPrice: number;
+  blockButton: boolean;
 
   constructor(private formBuilder: FormBuilder,
               @Inject(WEB3PROVIDER) private web3Provider,
@@ -52,7 +57,7 @@ export class TransactionDetailsComponent implements OnInit {
               private dialogService: DialogService,
               private route: ActivatedRoute,
               private router: Router,
-              private liveRateService: PubnubService,
+              private pubnubService: PubnubService,
               private sessionService: SessionService,
               private helperService: HelperService,
               private tradeDataService: TradeDataService) { }
@@ -65,6 +70,10 @@ export class TransactionDetailsComponent implements OnInit {
     this.splitCurrencyPair()
   }
 
+  ngOnDestroy(): void {
+    this.pubnubClient.disconnect();
+  }
+
   initVariables() {
     this.approveAmount = 0;
     this.ethBalance = 0;
@@ -72,7 +81,10 @@ export class TransactionDetailsComponent implements OnInit {
     this.quoteBalance = 0;
     this.bidRate = 0;
     this.askRate = 0;
+    this.sellBalance = 0;
+    this.gasPrice = 0;
 
+    this.blockButton = true;
     this.allowanceDisplay = false;
     this.currencies = Object.values(ECurrencyPair);
     this.selectedPair = this.currencies[0];
@@ -81,34 +93,36 @@ export class TransactionDetailsComponent implements OnInit {
 
   getBasicContractsInfo() {
     this.connectionInfo = this.getConnectionInfo();
-    this.liveRateService.connect(this.connectionInfo).addListener({message: async event => {
-      console.log("PUB MSG");
+    this.pubnubClient = this.pubnubService.connect(this.connectionInfo)
+      this.pubnubClient.addListener({message: async event => {
         if(event.message.content.type == "stream_depth"){
           this.data = event.message.content.data;
-
-          console.log(this.data.amount0Address);
-          console.log(this.data.amount1Address);
-
-          const sellTokenContract = this.blockchainService.getERC20Contract(this.data.amount0Address);
-          const buyTokenContract = this.blockchainService.getERC20Contract(this.data.amount1Address);
-          const currentContact = this.isOperationAsk() ? buyTokenContract : sellTokenContract;
+          this.blockButton = false;
 
           this.helperService.setAccuracy(this.data.amount0Dec);
 
-          //TODO: wprowadzić dwie zmienne do approve amount, żeby przy zamianie stron nie trzeba było czekać
-          this.approveAmount = this.helperService.toNumber(
-            await this.blockchainService.getAllowanceAmount(currentContact, this.data.contractAddress)
-          );
+          this.gasPrice = (this.helperService.toNumber(await this.providerService.getGasPrice())
+            *FILLORDER_RFQ_ESTIMATED_GAS_USAGE);
+          let sellTokenBalance = 0;
 
-          this.ethBalance = this.helperService.toNumber(await this.blockchainService.getBalance());
-          const sellBalance = this.helperService.toNumber(await this.blockchainService.getTokenBalance(sellTokenContract));
-          const buyBalance = this.helperService.toNumber(await this.blockchainService.getTokenBalance(buyTokenContract));
+          if(this.isWalletConnected()){
+            const sellTokenContract = this.blockchainService.getERC20Contract(this.data.amount0Address);
+            const buyTokenContract = this.blockchainService.getERC20Contract(this.data.amount1Address);
+            const currentContact = this.isOperationAsk() ? buyTokenContract : sellTokenContract;
+            this.approveAmount = this.helperService.toNumber(
+              await this.blockchainService.getAllowanceAmount(currentContact, this.data.contractAddress)
+            );
+            this.ethBalance = this.helperService.toNumber(await this.blockchainService.getBalance());
+            const sellBalance = this.helperService.toNumber(await this.blockchainService.getTokenBalance(sellTokenContract));
+            const buyBalance = this.helperService.toNumber(await this.blockchainService.getTokenBalance(buyTokenContract));
 
-          [this.baseBalance, this.quoteBalance] = [sellBalance, buyBalance];
+            [this.baseBalance, this.quoteBalance] = [sellBalance, buyBalance];
+            this.sellBalance = this.isOperationAsk() ? buyBalance : sellBalance;
+            sellTokenBalance = this.isOperationAsk() ? buyBalance : sellBalance;
+          }
           [this.bidRate, this.askRate] = [this.data.bid, this.data.ask];
 
           const formSellAmount = this.form.get('sellAmount');
-          const sellTokenBalance = this.isOperationAsk() ? buyBalance : sellBalance;
           formSellAmount.setValidators([
             Validators.required,
             this.allowanceValidator(this.approveAmount),
@@ -134,11 +148,17 @@ export class TransactionDetailsComponent implements OnInit {
     [this.sellToken, this.buyToken] = this.isOperationAsk() ? [this.quote, this.base] : [this.base, this.quote];
   }
 
-  changeCurrencySides() {
-    [this.sellToken, this.buyToken] = [this.buyToken, this.sellToken];
-    this.operation = this.isOperationAsk() ? EOperationType.BID : EOperationType.ASK;
-    this.router.navigate([], {relativeTo: this.route, queryParams:
-        { type: this.operation }, queryParamsHandling: 'merge'})
+  changeCurrencySides(buttonType: number) {
+    if(!this.isOperationSelected(buttonType)){
+      [this.sellToken, this.buyToken] = [this.buyToken, this.sellToken];
+      this.operation = this.isOperationAsk() ? EOperationType.BID : EOperationType.ASK;
+      this.router.navigate([], {relativeTo: this.route, queryParams:
+          { type: this.operation }, queryParamsHandling: 'merge'})
+    }
+  }
+
+  isOperationSelected(buttonType: number) {
+    return buttonType == this.operation;
   }
 
   getConnectionInfo(){
@@ -158,7 +178,11 @@ export class TransactionDetailsComponent implements OnInit {
     this.router.navigate([], {relativeTo: this.route, queryParams:
         { pair: pair, type: this.operation }, queryParamsHandling: 'merge'});
     this.splitCurrencyPair();
+    this.getParams();
+    this.selectedPair = this.form.controls.currencyPair.value;
     this.connectionInfo = this.getConnectionInfo();
+    this.pubnubClient.disconnect();
+    this.getBasicContractsInfo();
   }
 
 
@@ -177,7 +201,7 @@ export class TransactionDetailsComponent implements OnInit {
 
   showCreateSessionDialog() {
     const ref = this.dialogService.open(CreateSessionDialogComponent, {
-      header: 'Session creator',
+      header: 'Start session',
       width: '40vw',
     })
   }
@@ -198,7 +222,8 @@ export class TransactionDetailsComponent implements OnInit {
       type: this.operation,
       amount: this.form.get("sellAmount").value,
       ask: this.askRate,
-      bid: this.bidRate
+      bid: this.bidRate,
+      gasPrice: this.gasPrice,
     })
   }
 
@@ -215,5 +240,14 @@ export class TransactionDetailsComponent implements OnInit {
       if(control.value > max) return { [keyName]: true}
       else return null;
     }
+  }
+
+  isWalletConnected():boolean {
+    return this.blockchainService.isLogged();
+  }
+
+  connectToWallet() {
+    this.blockchainService.requestAccount();
+    window.location.reload();
   }
 }

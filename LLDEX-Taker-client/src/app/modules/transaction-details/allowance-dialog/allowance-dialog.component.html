@@ -1,24 +1,19 @@
 <form class="w-100" [formGroup]="form">
-    <div class="row text-center mb-2">
-      <h6 class="fw-normal">{{ currencyName }} Allowance</h6>
+    <div class="text-center mb-5">
+      Approve {{ currencyName }} to allow trade settlement up to approved amount.
     </div>
-    <div class="form-group">
-        <p-inputNumber formControlName="amount"
-                       styleClass="w-100"
-                       inputStyleClass="form-control-override"
-                       [showButtons]="true"
-                       [step]="0.001"
-                       [min]="0"></p-inputNumber>
+    <div class="my-5 mb-7 flex justify-center">
+<!--        <p-inputNumber formControlName="amount"-->
+<!--                       styleClass="w-100"-->
+<!--                       [showButtons]="true"-->
+<!--                       [step]="0.001"-->
+<!--                       [min]="0"></p-inputNumber>-->
+      <input type="number"
+             class="py-2.5 px-2 w-40 border border-gray-700 rounded text-center text-lg"
+             placeholder="Allowance"
+             formControlName="amount"/>
     </div>
-    <div class="row my-3 text-center">
-      <div class="col">
-        Approve {{ currencyName }} to allow trade settlement up to approved amount.
-      </div>
-    </div>
-    <div class="row justify-content-end mt-4">
-      <div class="col-auto">
-        <button type="button" class="btn btn-primary mx-2" (click)="updateAllowance()">Approve {{ currencyName }}</button>
-        <button type="button" class="btn btn-primary mx-2" (click)="cancel()">Cancel</button>
-      </div>
+    <div class="flex justify-center">
+      <button type="button" class="btn-primary" (click)="updateAllowance()">Approve {{ currencyName }}</button>
     </div>
 </form>

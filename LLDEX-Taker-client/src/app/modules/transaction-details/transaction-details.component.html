@@ -1,98 +1,193 @@
-<app-steps [activeIndex]=1></app-steps>
-<form action="" class="my-4" [formGroup]="form">
+<!--<app-steps [activeIndex]=1></app-steps>-->
+<!--<form action="" class="my-4" [formGroup]="form">-->
 
-  <div class="form-group">
-    <p-dropdown
-      styleClass="form-control"
-      formControlName="currencyPair"
-      [options]="currencies"
-      (onChange)="changePair()"></p-dropdown>
+<!--  <div class="form-group">-->
+<!--    <p-dropdown-->
+<!--      styleClass="form-control"-->
+<!--      formControlName="currencyPair"-->
+<!--      [options]="currencies"-->
+<!--      (onChange)="changePair()"></p-dropdown>-->
+<!--  </div>-->
+
+<!--  <div class="row justify-content-center align-items-center py-3">-->
+<!--    <div class="col-auto">SELL | {{ sellToken }}</div>-->
+<!--    <div class="col-auto">-->
+<!--      <button class="btn btn-primary" (click)="changeCurrencySides()">SWITCH</button>-->
+<!--    </div>-->
+<!--    <div class="col-auto">{{ buyToken }} | BUY</div>-->
+<!--  </div>-->
+
+<!--  <div class="row align-items-center my-3 mb-4">-->
+
+<!--    <div class="col">-->
+<!--      <div>I sell</div>-->
+<!--      <p-inputNumber formControlName="sellAmount"-->
+<!--                     minFractionDigits="3"-->
+<!--                     maxFractionDigits="15"-->
+<!--                     [showButtons]="true"-->
+<!--                     [step]="0.001"-->
+<!--                     [min]="0"></p-inputNumber>-->
+<!--      {{ sellToken }}-->
+<!--      <div class="text-danger">-->
+<!--        <span *ngIf="form.controls.sellAmount.invalid">-->
+<!--          {{ form.controls.sellAmount.errors | validationMessage }}-->
+<!--        </span>-->
+<!--        <span>&nbsp;</span>-->
+<!--      </div>-->
+<!--    </div>-->
+
+<!--    <div class="col row align-items-center">-->
+<!--      <div class="col-6">-->
+<!--        Approved<br/> {{ approveAmount }} {{ sellToken }}-->
+<!--        <div class="text-danger">-->
+<!--          <span *ngIf="form.controls.sellAmount.hasError('allowance')">-->
+<!--            Allowance too low-->
+<!--          </span>-->
+<!--          <span></span>-->
+<!--        </div>-->
+<!--      </div>-->
+<!--      <div class="col-6">-->
+<!--        <button class="btn btn-primary" [disabled]="!isSession()" (click)="showAllowanceDialog()">Approve {{ sellToken }}</button>-->
+<!--      </div>-->
+<!--    </div>-->
+<!--  </div>-->
+
+<!--  <div class="row">-->
+<!--    <div class="col-6">-->
+
+<!--      <div class="row align-items-center my-4">-->
+<!--        <div class="col">EHT Balance: <strong>{{ ethBalance }}</strong></div>-->
+<!--        <div class="col">-->
+<!--          <button class="btn btn-primary w-100" [disabled]="!isSession()">Wrap ETH</button>-->
+<!--        </div>-->
+<!--      </div>-->
+
+<!--      <div class="row align-items-center mt-4">-->
+<!--        <div class="col">{{ base }} Balance: <strong>{{ baseBalance }}</strong></div>-->
+<!--        <div class="col">-->
+<!--          <button class="btn btn-primary w-100" [disabled]="!isSession()">Unwrap {{ sellToken }}</button>-->
+<!--        </div>-->
+<!--      </div>-->
+<!--    </div>-->
+<!--    <div class="col-6">-->
+<!--      <div class="row">-->
+<!--        <div class="col-6 my-4 text-center">-->
+<!--          <div>Indicative bid</div>-->
+<!--          <div><strong>{{ bidRate | number}}</strong></div>-->
+<!--        </div>-->
+<!--        <div class="col-6 my-4 text-center">-->
+<!--          <div>Indicative ask</div>-->
+<!--          <div><strong>{{ askRate | number}}</strong></div>-->
+<!--        </div>-->
+<!--      </div>-->
+<!--      <div class="row">-->
+<!--        <div class="col-6 text-center">-->
+<!--          Max Liquidity: 0-->
+<!--        </div>-->
+<!--      </div>-->
+<!--    </div>-->
+<!--  </div>-->
+<!--  <div class="row align-items-center my-4">-->
+<!--    <div class="col">{{ quote }} Balance: <strong>{{ quoteBalance }}</strong></div>-->
+<!--    <div class="col">-->
+<!--      <button class="btn btn-primary w-100" (click)="showCreateSessionDialog()" *ngIf="!isSession()" >CREATE SESSION</button>-->
+<!--      <button class="btn btn-primary w-100" [disabled]="disableQuote()" *ngIf="isSession()" (click)="getQuote()">GET QUOTE</button>-->
+<!--    </div>-->
+<!--  </div>-->
+<!--</form>-->
+<div class="flex justify-center mt-12">
+  <div class="rounded bg-white w-1/4 py-1 px-4 border border-gray-400"  style="max-width: 425px">
+    <form action="" class="my-4" [formGroup]="form">
+      <div class="flex justify-between items-center">
+        <h2 class="font-bold text-xl">Trade</h2>
+        <i class="pi pi-cog"></i>
+      </div>
+      <div class="my-5">
+        <label for="pair" class="text-gray-400 text-sm">Pair</label>
+        <p-dropdown
+          styleClass="w-full px-2 text-black"
+          formControlName="currencyPair"
+          [options]="currencies"
+          id="pair"
+          (onChange)="changePair()"></p-dropdown>
+      </div>
+      <div class="my-5">
+        <p class="text-gray-400 text-sm">Indicative quotes</p>
+        <div class="rounded border border-gray-400 flex">
+          <div class="w-2/4 text-center py-1">
+            <div class="font-bold text-lg">{{ bidRate | number}}</div>
+            <div class="font-bold text-sm text-gray-500">BID</div>
+          </div>
+          <div class="w-2/4 text-center border-0 border-l border-gray-400 py-1">
+            <div class="font-bold text-lg">{{ askRate | number}}</div>
+            <div class="font-bold text-sm text-gray-500">ASK</div>
+          </div>
+        </div>
+      </div>
+      <div class="my-5">
+        <p class="text-gray-400 text-sm">Side</p>
+        <div class="rounded border border-gray-400 flex items-center">
+          <div class="w-2/4 text-center pt-3 pb-2.5 text-sm font-bold hover:bg-gray-200"
+               (click)="changeCurrencySides(1)"
+               [ngClass]="isOperationSelected(1)
+                ? 'bg-gray-700 text-white hover:bg-gray-700 cursor-default' : 'text-gray-600 cursor-pointer '">
+            SELL {{base}} / BUY {{quote}}
+          </div>
+          <div class="w-2/4 text-center pt-3 pb-2.5 text-sm border-0 border-l border-gray-400 font-bold hover:bg-gray-200"
+               (click)="changeCurrencySides(2)"
+                [ngClass]="isOperationSelected(2)
+                ? 'bg-gray-700 text-white hover:bg-gray-700 cursor-default' : 'text-gray-600 cursor-pointer '">
+            SELL {{quote}} / BUY {{base}}
+          </div>
+        </div>
+      </div>
+      <div class="my-5">
+        <label for="amount" class="text-gray-400 text-sm">I sell</label><br/>
+        <div class="border border-gray-400 rounded h-10 flex items-center">
+          <input type="number"
+                 id="amount"
+                 class="h-full w-4/5 px-3 rounded"
+                 formControlName="sellAmount">
+          <div class="text-right w-1/5 pr-3 font-bold">{{sellToken}}</div>
+        </div>
+      </div>
+
+      <div class="flex justify-between text-sm mb-2">
+        <div>Gas fee: </div>
+        <div >~ <span class="font-bold">{{ gasPrice.toFixed(8) }} {{ sellToken }}</span></div>
+      </div>
+
+      <div class="flex justify-between text-sm my-2">
+        <div>Amount to convert: </div>
+        <div>~ <span class="font-bold">{{ (form.controls.sellAmount.value - gasPrice).toFixed(8) }} {{ sellToken }}</span></div>
+      </div>
+      <div class="flex justify-between text-sm my-2" *ngIf="isWalletConnected()">
+        <div>Balance: </div>
+        <div class="font-bold">{{ sellBalance }} {{ sellToken }}</div>
+      </div>
+      <div class="mt-6">
+        <button type="button" class="py-2.5 w-full bg-gray-700 text-white rounded hover:bg-gray-600"
+                *ngIf="!isWalletConnected()"
+                (click)="connectToWallet()">Connect to a wallet</button>
+
+        <button type="button" class="py-2.5 w-full bg-gray-700 text-white rounded hover:bg-gray-600"
+                (click)="showCreateSessionDialog()"
+                *ngIf="isWalletConnected() && !isSession() && !form.controls.sellAmount.hasError('allowance')"
+                >Start session</button>
+
+        <button type="button" class="py-2.5 w-full bg-gray-700 text-white rounded disabled:opacity-50 hover:bg-gray-600"
+                (click)="showAllowanceDialog()"
+                *ngIf="form.controls.sellAmount.hasError('allowance')"
+                [disabled]="blockButton"
+                >Approve {{ sellToken }}</button>
+
+        <button type="button" class="py-2.5 w-full bg-gray-700 text-white rounded disabled:opacity-50 hover:bg-gray-600"
+                (click)="getQuote()"
+                *ngIf="isWalletConnected() && isSession() && !form.controls.sellAmount.hasError('allowance')"
+                [disabled]="!form.controls.sellAmount.valid || blockButton"
+                > Get quote</button>
+      </div>
+    </form>
   </div>
-
-  <div class="row justify-content-center align-items-center py-3">
-    <div class="col-auto">SELL | {{ sellToken }}</div>
-    <div class="col-auto">
-      <button class="btn btn-primary" (click)="changeCurrencySides()">SWITCH</button>
-    </div>
-    <div class="col-auto">{{ buyToken }} | BUY</div>
-  </div>
-
-  <div class="row align-items-center my-3 mb-4">
-
-    <div class="col">
-      <div>I sell</div>
-      <p-inputNumber formControlName="sellAmount"
-                     minFractionDigits="3"
-                     maxFractionDigits="15"
-                     [showButtons]="true"
-                     [step]="0.001"
-                     [min]="0"></p-inputNumber>
-      {{ sellToken }}
-      <div class="text-danger">
-        <span *ngIf="form.controls.sellAmount.invalid">
-          {{ form.controls.sellAmount.errors | validationMessage }}
-        </span>
-        <span>&nbsp;</span>
-      </div>
-    </div>
-
-    <div class="col row align-items-center">
-      <div class="col-6">
-        Approved<br/> {{ approveAmount }} {{ sellToken }}
-        <div class="text-danger">
-          <span *ngIf="form.controls.sellAmount.hasError('allowance')">
-            Allowance too low
-          </span>
-          <span></span>
-        </div>
-      </div>
-      <div class="col-6">
-        <button class="btn btn-primary" [disabled]="!isSession()" (click)="showAllowanceDialog()">Approve {{ sellToken }}</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="row">
-    <div class="col-6">
-
-      <div class="row align-items-center my-4">
-        <div class="col">EHT Balance: <strong>{{ ethBalance }}</strong></div>
-        <div class="col">
-          <button class="btn btn-primary w-100" [disabled]="!isSession()">Wrap ETH</button>
-        </div>
-      </div>
-
-      <div class="row align-items-center mt-4">
-        <div class="col">{{ base }} Balance: <strong>{{ baseBalance }}</strong></div>
-        <div class="col">
-          <button class="btn btn-primary w-100" [disabled]="!isSession()">Unwrap {{ sellToken }}</button>
-        </div>
-      </div>
-    </div>
-    <div class="col-6">
-      <div class="row">
-        <div class="col-6 my-4 text-center">
-          <div>Indicative bid</div>
-          <div><strong>{{ bidRate | number}}</strong></div>
-        </div>
-        <div class="col-6 my-4 text-center">
-          <div>Indicative ask</div>
-          <div><strong>{{ askRate | number}}</strong></div>
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-6 text-center">
-          Max Liquidity: 0
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="row align-items-center my-4">
-    <div class="col">{{ quote }} Balance: <strong>{{ quoteBalance }}</strong></div>
-    <div class="col">
-      <button class="btn btn-primary w-100" (click)="showCreateSessionDialog()" *ngIf="!isSession()" >CREATE SESSION</button>
-      <button class="btn btn-primary w-100" [disabled]="disableQuote()" *ngIf="isSession()" (click)="getQuote()">GET QUOTE</button>
-    </div>
-  </div>
-</form>
+</div>
 <p-toast></p-toast>

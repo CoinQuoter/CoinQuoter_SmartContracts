@@ -1,36 +1,29 @@
-<div class="bg-white p-3 pb-4 rounded price-info">
-  <div class="d-flex flex-row justify-content-between pb-3 header">
-    <div style="font-weight: 500" class="text-dark currency">{{ connection.title }}</div>
-    <div class="date">SPT({{ today }})</div>
+<div class="bg-white pb-2 my-2 mx-2 rounded-lg shadow-lg border border-gray-300" style="max-width: 500px;">
+  <div class="flex justify-between py-4 px-5 items-center">
+    <div class="font-bold" >{{ connection.title }}</div>
+    <div class="text-sm text-gray-500">SPT({{ today }})</div>
   </div>
-  <div class="d-flex flex-row justify-content-between">
+  <div class="flex justify-between h-28 pb-8">
     <app-rate-info
       [price]="bidRate"
       title="SELL"
       [redirect]="getRedirectRoute(EBid)"
-      class="col-5 rate py-2 px-4 d-flex"></app-rate-info>
-
-    <div class="col-2 text-center diff-indicator py-1">
-      <div class="p-0 d-flex justify-content-center align-items-end">
-        <img alt="up"
-             src="assets/image/caret-up-green.svg"
-             width="20%"
-             *ngIf="isDifferenceBigger(); else empty" />
-      </div>
+      ></app-rate-info>
+    <div class="flex flex-col items-center justify-center">
+      <img alt="up"
+           src="assets/image/caret-up-green.svg"
+           [ngClass]="{'opacity-0': !isDifferenceBigger() }"
+           width="13%"/>
       <div class="difference">{{ difference | number }}</div>
-      <div class="p-0 d-flex justify-content-center align-items-start">
-        <img alt="up"
-             src="assets/image/caret-down-red.svg"
-             width="20%"
-             *ngIf="isDifferenceLower(); else empty" />
-      </div>
+      <img alt="up"
+           [ngClass]="{'opacity-0': !isDifferenceLower() }"
+           src="assets/image/caret-down-red.svg"
+           width="13%"/>
     </div>
-
     <app-rate-info
       [price]="askRate"
       title="BUY"
-      [redirect]="getRedirectRoute(EAsk)"
-      class="col-5 rate py-2 px-4 d-flex"></app-rate-info>
+      [redirect]="getRedirectRoute(EAsk)"></app-rate-info>
   </div>
 </div>
 

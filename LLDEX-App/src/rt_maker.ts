@@ -714,7 +714,7 @@ async function _appendPair(pair: TokenPair) {
 }
 
 function _initBinanceStream(pair: TokenPair) {
-    const streamBNB = new WebSocket(`${BinanceConfig.testnetWebSocket}/${pair.mappingBinance}@depth5@100ms`)
+    const streamBNB = new WebSocket(`${BinanceConfig.testnetWebSocket}/${pair.mappingBinance}@depth5@1000ms`)
     streamBNB.onopen = function (_) {
         console.log(`Connected to binance ${pair.mappingBinance} pricing stream`)
     }

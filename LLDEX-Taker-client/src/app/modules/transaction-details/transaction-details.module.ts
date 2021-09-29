@@ -12,7 +12,7 @@ import { AllowanceDialogComponent } from './allowance-dialog/allowance-dialog.co
 import { DialogService } from 'primeng/dynamicdialog';
 import { MessageService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
-import { CreateSessionDialogComponent } from './create-session-dialog/create-session-dialog.component';
+import { CreateSessionDialogComponent } from '../../shared/components/create-session-dialog/create-session-dialog.component';
 import { SliderModule } from 'primeng/slider';
 
 

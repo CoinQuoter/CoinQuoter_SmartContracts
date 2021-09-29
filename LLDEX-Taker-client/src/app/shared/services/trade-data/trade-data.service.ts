@@ -7,6 +7,7 @@ export interface TradeData {
   amount: number;
   ask: number;
   bid: number;
+  gasPrice: number;
 }
 
 @Injectable({

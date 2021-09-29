@@ -1,20 +1,17 @@
-<app-steps [activeIndex]=0></app-steps>
-<div class="w-100 h-100 mt-4">
-  <div class="row">
+<div class="w-3/5 mx-auto mt-16">
+  <div class="flex flex-wrap">
     <app-exchange-rate
       [connection]="weth_dai"
-      class="col-lg-6 mb-4"></app-exchange-rate>
+      class="w-2/4"></app-exchange-rate>
     <app-exchange-rate
-      [connection]="weth_dai"
-      class="col-lg-6 mb-4"></app-exchange-rate>
-  </div>
-  <div class="row">
-    <app-exchange-rate
-      [connection]="weth_dai"
-      class="col-lg-6 mb-4"></app-exchange-rate>
-    <app-exchange-rate
-      [connection]="weth_dai"
-      class="col-lg-6 mb-4"></app-exchange-rate>
+      [connection]="weth_lldex"
+      class="w-2/4"></app-exchange-rate>
+<!--    <app-exchange-rate-->
+<!--      [connection]="weth_dai"-->
+<!--      class="w-2/4"></app-exchange-rate>-->
+<!--    <app-exchange-rate-->
+<!--      [connection]="weth_lldex"-->
+<!--      class="w-2/4"></app-exchange-rate>-->
   </div>
 </div>
 <p-confirmDialog [breakpoints]="{'960px': '75vw', '640px': '100vw'}"></p-confirmDialog>

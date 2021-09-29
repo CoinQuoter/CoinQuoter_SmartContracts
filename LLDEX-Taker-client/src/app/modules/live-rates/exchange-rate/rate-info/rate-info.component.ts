@@ -61,22 +61,31 @@ export class RateInfoComponent implements OnInit {
     if(this.blockchainService.isLogged()){
       this.changeRoute();
     }else{
-      this.confirmationService.confirm({
-        header: "Connection",
-        message: "You are not connected with MetaMask. Would you like to log in?",
-        accept: () => {
-          this.blockchainService.requestAccount().then(()=>{
-            this.changeRoute();
-          }).catch(() => {
-            this.messageService.add({
-              severity: "warn",
-              summary: "Error",
-              detail: "There was a problem with connection. Please try again."
-            });
-          })
-        }
-      })
-    }
+      if(this.blockchainService.isExtensionInstalled()){
+        this.confirmationService.confirm({
+          header: "Connection",
+          message: "You are not connected with MetaMask. Would you like to log in?",
+          accept: () => {
+            this.blockchainService.requestAccount().then(()=>{
+              this.changeRoute();
+            }).catch(() => {
+              this.messageService.add({
+                severity: "warn",
+                summary: "Error",
+                detail: "There was a problem with connection. Please try again."
+              });
+            })
+          }
+        })
+      }else{
+        this.messageService.add({
+          severity: "warn",
+          summary: "Warning",
+          detail: "No wallet extension is installed"
+        })
+      } //isExtensionInstalled
+
+    }//isLooged
   }
 
   changeRoute() {

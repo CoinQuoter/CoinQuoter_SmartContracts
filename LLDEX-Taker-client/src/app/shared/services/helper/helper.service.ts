@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ECurrencyPair } from '../../enums/currency-pair.constants';
-import { WETH_DAI } from '../../constants/connections.constants';
+import { WETH_DAI, WETH_LLDEX } from '../../constants/connections.constants';
 import { ConnectionInfo } from '../../models/connection-info';
 import { BigNumber } from 'ethers';
 
@@ -16,6 +16,7 @@ export class HelperService {
   getConnectionInfo(selectedPair: string): ConnectionInfo {
     switch (selectedPair){
       case ECurrencyPair.WETH_DAI: return WETH_DAI;
+      case ECurrencyPair.WETH_LLDEX: return WETH_LLDEX;
     }
   }
 

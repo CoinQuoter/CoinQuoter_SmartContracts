@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, NavigationStart, Router } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { ConnectionInfo } from '../../shared/models/connection-info';
@@ -15,7 +15,7 @@ import { ExecutionDataService } from '../../shared/services/execution-data/execu
   templateUrl: './trade.component.html',
   styleUrls: ['./trade.component.css']
 })
-export class TradeComponent implements OnInit {
+export class TradeComponent implements OnInit, OnDestroy {
 
   connectionInfo: ConnectionInfo;
   tradeData: TradeData;
@@ -27,13 +27,16 @@ export class TradeComponent implements OnInit {
   bid: number;
   ask: number;
   data: any;
+  price: number;
+  gasPrice: number;
 
   base: string;
   quote: string;
   sellToken: string;
   buyToken: string;
   pair: string;
-
+  disableButton: boolean;
+  pubnubClient: any;
 
   constructor(private router: Router,
               @Inject(WEB3PROVIDER) private web3Provider,
@@ -53,23 +56,33 @@ export class TradeComponent implements OnInit {
 
     [this.sellToken, this.buyToken] = this.isOperationAsk() ? [this.quote, this.base] : [this.base, this.quote];
 
-    this.liveRateService.connect(this.connectionInfo).addListener({ message: async event => {
+    this.pubnubClient = this.liveRateService.connect(this.connectionInfo)
+    this.pubnubClient .addListener({ message: async event => {
       if(event.message.content.type == "stream_depth") {
         this.data = event.message.content.data;
 
         const baseTokenContract = this.blockchainService.getERC20Contract(this.data.amount0Address);
         const quoteTokenContract = this.blockchainService.getERC20Contract(this.data.amount1Address);
 
-        const baseBalance = this.helperService.toNumber(await this.blockchainService.getTokenBalance(baseTokenContract));
-        const quoteBalance = this.helperService.toNumber(await this.blockchainService.getTokenBalance(quoteTokenContract));
-        [this.baseBalance, this.quoteBalance] = [baseBalance, quoteBalance];
+        this.bid = this.data.bid;
+        this.ask = this.data.ask;
+        this.buyAmount = this.isOperationAsk() ? this.sellAmount/this.ask : this.sellAmount * this.bid;
 
-        this.baseBalance -= this.isOperationAsk() ? -this.buyAmount : this.sellAmount;
-        this.quoteBalance -= this.isOperationAsk() ? this.sellAmount : -this.buyAmount;
+        let baseBalance = this.helperService.toNumber(await this.blockchainService.getTokenBalance(baseTokenContract));
+        let quoteBalance = this.helperService.toNumber(await this.blockchainService.getTokenBalance(quoteTokenContract));
 
+        baseBalance -= this.isOperationAsk() ? -this.buyAmount : this.sellAmount;
+        quoteBalance -= this.isOperationAsk() ? this.sellAmount : -this.buyAmount;
+        this.price = this.isOperationAsk() ? this.ask : this.bid;
+        [this.baseBalance, this.quoteBalance] = this.isOperationAsk() ? [quoteBalance, baseBalance] : [baseBalance, quoteBalance];
+        this.disableButton = false;
       }
       }
     })
+  }
+
+  ngOnDestroy(): void {
+    this.pubnubClient.disconnect();
   }
 
   private isOperationAsk() {
@@ -85,6 +98,9 @@ export class TradeComponent implements OnInit {
     this.quote = "";
     this.bid = 0;
     this.ask = 0;
+    this.price = 0;
+    this.gasPrice = 0;
+    this.disableButton = true;
   }
 
   retrieveTradeData() {
@@ -92,10 +108,11 @@ export class TradeComponent implements OnInit {
     this.connectionInfo = this.helperService.getConnectionInfo(this.tradeData.pair);
     this.pair = this.tradeData.pair;
     this.operation = this.tradeData.type;
-    this.bid = this.tradeData.bid;
-    this.ask = this.tradeData.ask;
+    // this.bid = this.tradeData.bid;
+    // this.ask = this.tradeData.ask;
     this.sellAmount = this.tradeData.amount;
-    this.buyAmount = this.isOperationAsk() ? this.sellAmount/this.ask : this.sellAmount * this.bid;
+    // this.buyAmount = this.isOperationAsk() ? this.sellAmount/this.ask : this.sellAmount * this.bid;
+    this.gasPrice = this.tradeData.gasPrice;
   }
 
   executeTrade() {
@@ -104,7 +121,13 @@ export class TradeComponent implements OnInit {
       data: this.data,
       sellAmount: this.sellAmount,
       buyAmount: this.buyAmount,
-      config: this.connectionInfo
+      config: this.connectionInfo,
+      price: this.price,
+      sellBalance: this.baseBalance,
+      buyBalance: this.quoteBalance,
+      sellToken: this.sellToken,
+      buyToken: this.buyToken,
+      gasPrice: this.gasPrice,
     })
     this.router.navigate(['/transaction-status']);
   }

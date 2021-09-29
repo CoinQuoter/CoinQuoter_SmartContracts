@@ -1,0 +1,71 @@
+<!--<form action="">-->
+<!--  <div class="text-center">-->
+<!--    <h6 class="fw-normal">Select session length</h6>-->
+<!--  </div>-->
+<!--  <div class="row my-3 mt-5">-->
+<!--    <p-slider [(ngModel)]="sessionTime"-->
+<!--              name="sessionTime"-->
+<!--              [min]="300"-->
+<!--              [max]="3600"-->
+<!--              [step]="300"-->
+<!--    ></p-slider>-->
+<!--  </div>-->
+<!--  <div class="row my-3">-->
+<!--    <div class="col text-start">5 min</div>-->
+<!--    <div class="col text-end">1 h</div>-->
+<!--  </div>-->
+<!--  <div class="form-group">-->
+<!--    <p-inputNumber styleClass="w-100"-->
+<!--                   inputStyleClass="form-control-override"-->
+<!--                   name="sessionTime"-->
+<!--                   [min]="30"-->
+<!--                   [showButtons]="true"-->
+<!--                   [(ngModel)]="sessionTime"-->
+<!--                   ></p-inputNumber>-->
+<!--  </div>-->
+<!--  <div class="text-center my-4">-->
+<!--    Estimated session expiration timestamp<br/>-->
+<!--    <strong>{{ getSessionExpire() }}</strong>-->
+<!--  </div>-->
+<!--  <div class="row justify-content-end mt-4 pt-2">-->
+<!--    <div class="col-auto">-->
+<!--      <button type="button" class="btn btn-primary mx-2" [disabled]="!formEnable" (click)="createSession()">Create session</button>-->
+<!--      <button type="button" class="btn btn-primary mx-2" [disabled]="!formEnable" (click)="close()">Cancel</button>-->
+<!--    </div>-->
+<!--  </div>-->
+<!--</form>-->
+<div class="flex flex-col items-center justify-center">
+  <div>You need to have a valid session in order to start trading.</div>
+  <div class="flex flex-wrap gap-x-2 my-5">
+
+    <button (click)="changeButton(1)"
+            class="px-3 py-1 w-24 rounded border-2 border-gray-500"
+            [ngClass]=" selectedButton == 1 ? 'bg-gray-700 text-white cursor-default' : 'text-gray-600 hover:bg-gray-500 hover:text-white'">
+      5 min</button>
+
+    <button (click)="changeButton(2)"
+            class="px-3 py-1 w-24 rounded border-2 border-gray-500"
+            [ngClass]=" selectedButton == 2 ? 'bg-gray-700 text-white cursor-default' : 'text-gray-600 hover:bg-gray-500 hover:text-white'">
+      15 min</button>
+
+    <button (click)="changeButton(3)"
+            class="px-3 py-1 w-24 rounded border-2 border-gray-500"
+            [ngClass]=" selectedButton == 3 ? 'bg-gray-700 text-white cursor-default' : 'text-gray-600 hover:bg-gray-500 hover:text-white'">
+      30 min</button>
+
+    <div class="w-24 rounded border-2 border-gray-500 text-gray-600" [ngClass]="{'border-gray-800' : selectedButton == 4}">
+      <form action="" [formGroup]="form">
+        <input type="number"
+               class="w-full px-3 py-1 rounded focus:ring-gray-500 text-center"
+               placeholder="Custom"
+               formControlName="sessionLength"
+               (focus)="changeButton(4)"/>
+      </form>
+    </div>
+  </div>
+  <div>
+    <button class="py-1.5 px-8 bg-gray-700 text-white rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-default"
+            [disabled]="!formIsValid()" (click)="createSession()">Start session</button>
+  </div>
+
+</div>

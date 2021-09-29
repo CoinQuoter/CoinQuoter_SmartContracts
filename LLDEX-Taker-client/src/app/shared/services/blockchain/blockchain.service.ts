@@ -7,6 +7,7 @@ import Web3 from 'web3';
 import { LimitOrderBuilder, PrivateKeyProviderConnector } from '../../../../../../limit-order-protocol-utils/dist';
 import { ConnectionInfo } from '../../models/connection-info';
 import { PubnubService } from '../pubnub/pubnub.service';
+import { FEE_TOKEN_ADDRESS, FRONTEND_ADDRESS, LIMITORDERPROTOCOL_ADDRESS } from '../../constants/config.constants';
 
 const ABIERC20: string[] = [
   "function allowance(address _owner, address _spender) public view returns (uint256 remaining)",
@@ -31,16 +32,20 @@ export class BlockchainService {
               private pubnubService: PubnubService) {
   }
 
+  isExtensionInstalled(): boolean {
+    return !!this.web3Provide;
+  }
+
   isLogged(): boolean {
-    return !!this.web3Provide._state.accounts[0];
+    return this.isExtensionInstalled() && !!this.web3Provide._state.accounts && this.web3Provide._state.accounts.length > 0;
   }
 
   requestAccount() {
     return this.web3Provide.request({method: 'eth_requestAccounts'});
   }
 
-  getSignerAddress() {
-    return this.web3Provide._state.accounts[0];
+  async getSignerAddress() {
+    return await this.providerService.getSigner(0).getAddress();
   }
 
   async updateAllowance(data: any, type: number, allowance: number){
@@ -56,12 +61,12 @@ export class BlockchainService {
     return new ethers.Contract(address, ABIERC20, this.providerService)
   }
 
-  getTokenBalance(contract: ethers.Contract) {
-    return contract.connect(this.getSignerAddress()).balanceOf(this.getSignerAddress());
+  async getTokenBalance(contract: ethers.Contract) {
+    return contract.connect(await this.getSignerAddress()).balanceOf(this.getSignerAddress());
   }
 
-  getAllowanceAmount(contract: ethers.Contract, limitOrderProtocolAddress: string) {
-    return contract.connect(this.getSignerAddress()).allowance(this.getSignerAddress(), limitOrderProtocolAddress)
+  async getAllowanceAmount(contract: ethers.Contract, limitOrderProtocolAddress: string) {
+    return contract.connect(await this.getSignerAddress()).allowance(this.getSignerAddress(), limitOrderProtocolAddress)
   }
 
   getBalance() {
@@ -75,7 +80,10 @@ export class BlockchainService {
     const web3 = new Web3(window.ethereum);
     const walletAddress = await this.providerService.getSigner(0).getAddress();
     const providerConnector = new PrivateKeyProviderConnector(sessionPrivateKey, web3);
-    let limitOrderBuilder = new LimitOrderBuilder(data.contractAddress, 31337, providerConnector);
+    let limitOrderBuilder = new LimitOrderBuilder(
+      LIMITORDERPROTOCOL_ADDRESS,
+      (await this.providerService.getNetwork()).chainId,
+      providerConnector);
 
     let amountIn = (amountInput * Math.pow(10, data.amount0Dec)).toLocaleString('fullwide', {useGrouping:false});
     let amountOut = (amountOutput * Math.pow(10, data.amount1Dec)).toLocaleString('fullwide', {useGrouping:false});
@@ -97,9 +105,9 @@ export class BlockchainService {
       makerAddress: data.makerAddress,
       takerAmount: amountIn,
       makerAmount: amountOut,
-      feeTokenAddress: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+      feeTokenAddress: FEE_TOKEN_ADDRESS,
       feeAmount: "0",
-      frontendAddress: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+      frontendAddress: FRONTEND_ADDRESS
     })
 
     const resultEIP712 = limitOrderBuilder.buildRFQOrderTypedData(limitOrder);
@@ -128,10 +136,9 @@ export class BlockchainService {
       message: {
         content: {
           type: "action",
-          method: "bid_execute",
+          method: "execute_order",
           data: {
             type: Number(type),
-            price: "",
             takerAmount: oneInchOrder.takerAmount,
             makerAmount: oneInchOrder.makerAmount,
             limitOrderSignature: oneInchOrder.limitOrderSignature,

@@ -7,7 +7,13 @@ export interface ExecutionData {
   data: any,
   sellAmount: number,
   buyAmount: number,
-  config: ConnectionInfo
+  config: ConnectionInfo,
+  price: number,
+  sellBalance: number,
+  buyBalance: number,
+  sellToken: string,
+  buyToken: string,
+  gasPrice: number,
 }
 
 @Injectable({

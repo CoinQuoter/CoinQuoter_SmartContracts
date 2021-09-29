@@ -18,12 +18,12 @@ export const APP_ROUTES: Route[] = [
   {
     path: 'trade',
     loadChildren: () => import('./modules/trade/trade.module').then(m => m.TradeModule),
-    canActivate: [SessionGuardService, TradeDataGuardService]
+    canActivate: [MetamaskGuardService, SessionGuardService, TradeDataGuardService]
   },
   {
     path: 'transaction-status',
     loadChildren: () => import('./modules/transaction-status/transaction-status.module').then(m => m.TransactionStatusModule),
-    canActivate: [SessionGuardService, TradeDataGuardService, ExecutionDataGuardService]
+    canActivate: [MetamaskGuardService, SessionGuardService, TradeDataGuardService, ExecutionDataGuardService]
   },
 
 ]

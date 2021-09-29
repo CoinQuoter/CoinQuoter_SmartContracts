@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import * as PubNub from "pubnub";
 import { ConnectionInfo } from '../../models/connection-info';
 import { ELocalstorageNames } from '../../enums/localstorage-names.constants';
+import { PubnubConfig } from '../../constants/config.constants';
 
 @Injectable({
   providedIn: 'root'
@@ -24,7 +25,7 @@ export class PubnubService {
 
   private createClient(config: ConnectionInfo) {
     const uuid = this.getUUID();
-    const pubNubConfigClient = {...config.pubNubClient, uuid: uuid};
+    const pubNubConfigClient = {...PubnubConfig, uuid: uuid};
     return new PubNub(pubNubConfigClient);
   }
 

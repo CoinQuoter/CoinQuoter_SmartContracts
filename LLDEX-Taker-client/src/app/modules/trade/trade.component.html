@@ -1,42 +1,80 @@
-<app-steps [activeIndex]=2></app-steps>
-<div>
-  <div class="row my-4 mb-5 pb-2 border-bottom">
-    <h5 class="fw-normal">{{connectionInfo.title}}</h5>
-  </div>
-  <div class="row my-3 align-items-center">
-    <div class="col-6 text-center">
-      I sell <strong>{{ sellAmount }}</strong> {{ sellToken }}
-    </div>
-    <div class="col-6 text-center">
-      I buy <strong>{{ buyAmount }}</strong> {{ buyToken }}
-    </div>
-  </div>
-  <div class="row mt-5">
-    <div class="col-6">
+<!--<app-steps [activeIndex]=2></app-steps>-->
+<!--<div>-->
+<!--  <div class="row my-4 mb-5 pb-2 border-bottom">-->
+<!--    <h5 class="fw-normal">{{connectionInfo.title}}</h5>-->
+<!--  </div>-->
+<!--  <div class="row my-3 align-items-center">-->
+<!--    <div class="col-6 text-center">-->
+<!--      I sell <strong>{{ sellAmount }}</strong> {{ sellToken }}-->
+<!--    </div>-->
+<!--    <div class="col-6 text-center">-->
+<!--      I buy <strong>{{ buyAmount }}</strong> {{ buyToken }}-->
+<!--    </div>-->
+<!--  </div>-->
+<!--  <div class="row mt-5">-->
+<!--    <div class="col-6">-->
 
-      <div class="row">
-        <div class="col">{{ base }} balance after swap: <strong>{{ this.baseBalance }}</strong></div>
+<!--      <div class="row">-->
+<!--        <div class="col">{{ base }} balance after swap: <strong>{{ this.baseBalance }}</strong></div>-->
+<!--      </div>-->
+
+<!--      <div class="row">-->
+<!--        <div class="col">{{ quote }} balance after swap: <strong>{{ this.quoteBalance }}</strong></div>-->
+<!--      </div>-->
+
+<!--    </div>-->
+<!--  </div>-->
+<!--  <div class="row mt-4">-->
+<!--    <div class="col-6">Indicative ask: <strong>{{ ask | number}}</strong></div>-->
+<!--    <div class="col-6">Indicative bid: <strong>{{ bid | number}}</strong></div>-->
+<!--  </div>-->
+<!--  <div class="row mt-5 pt-4">-->
+<!--    <div class="col-5">-->
+<!--      <button class="btn btn-outline-warning w-100"-->
+<!--              [routerLink]="['/transaction-details']"-->
+<!--              [queryParams]="{pair: pair, type: operation, amount: sellAmount}">CANCEL</button></div>-->
+<!--    <div class="col-2"></div>-->
+<!--    <div class="col-5">-->
+<!--      <button class="btn btn-outline-success w-100" (click)="executeTrade()">CONFIRM</button>-->
+<!--    </div>-->
+<!--  </div>-->
+
+<!--</div>-->
+<div class="flex justify-center mt-12">
+  <div class="rounded bg-white w-1/4 py-1 px-4 border border-gray-400"  style="max-width: 425px">
+    <div class="flex justify-center items-center my-4">
+      <h2 class="font-bold text-xl">Confirm trade</h2>
+    </div>
+    <div class="flex flex-wrap">
+      <div class="w-1/2 text-center py-2.5">
+        <div class="text-gray-500">You pay</div>
+        <div class="font-bold text-lg">{{sellAmount}} {{sellToken}}</div>
+        <div class="text-gray-500 text-sm">(incl. {{ gasPrice.toFixed(8) }} gas fee)</div>
       </div>
-
-      <div class="row">
-        <div class="col">{{ quote }} balance after swap: <strong>{{ this.quoteBalance }}</strong></div>
+      <div class="w-1/2 text-center py-2.5 border-l border-gray-300">
+        <div class="text-gray-500">You receive</div>
+        <div class="font-bold text-lg">{{buyAmount}} {{buyToken}}</div>
       </div>
-
+      <div class="w-1/2 text-center py-2.5">
+        <div class="text-gray-500">Balance after trade</div>
+        <div class="font-bold text-lg">{{baseBalance}} {{sellToken}}</div>
+      </div>
+      <div class="w-1/2 text-center py-2.5 border-l border-gray-300">
+        <div class="text-gray-500">Balance after trade</div>
+        <div class="font-bold text-lg">{{quoteBalance}} {{buyToken}}</div>
+      </div>
+    </div>
+    <div class="text-center mt-12 mb-8 font-bold text-2xl">
+      Price: {{ price }}
+    </div>
+    <div class="text-center my-5">
+      <a href="#" class="underline text-gray-500 hover:text-gray-800" routerLink="/transaction-details">Cancel</a>
+    </div>
+    <div class="my-5">
+      <button class="py-3 px-4 w-full bg-green-800 text-white rounded hover:bg-green-600 disabled:opacity-50"
+              (click)="executeTrade()"
+              [disabled]="disableButton"
+      >Confirm</button>
     </div>
   </div>
-  <div class="row mt-4">
-    <div class="col-6">Indicative ask: <strong>{{ ask | number}}</strong></div>
-    <div class="col-6">Indicative bid: <strong>{{ bid | number}}</strong></div>
-  </div>
-  <div class="row mt-5 pt-4">
-    <div class="col-5">
-      <button class="btn btn-outline-warning w-100"
-              [routerLink]="['/transaction-details']"
-              [queryParams]="{pair: pair, type: operation, amount: sellAmount}">CANCEL</button></div>
-    <div class="col-2"></div>
-    <div class="col-5">
-      <button class="btn btn-outline-success w-100" (click)="executeTrade()">CONFIRM</button>
-    </div>
-  </div>
-
 </div>

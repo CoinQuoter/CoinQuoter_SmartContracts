@@ -8,8 +8,11 @@ import { NavbarComponent } from './components/navbar/navbar.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { StepsModule } from 'primeng/steps';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { ConfirmationService } from 'primeng/api';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { OverlayPanelModule } from 'primeng/overlaypanel';
+import { DialogService } from 'primeng/dynamicdialog';
+import { FormBuilder } from '@angular/forms';
+import { ToastModule } from 'primeng/toast';
 
 export function enableWeb3Provider(provider) {
   return () => {
@@ -28,10 +31,14 @@ export function enableWeb3Provider(provider) {
     RouterModule.forRoot(APP_ROUTES),
     StepsModule,
     ConfirmDialogModule,
-    OverlayPanelModule
+    OverlayPanelModule,
+    ToastModule
   ],
   providers: [
-    ConfirmationService
+    ConfirmationService,
+    DialogService,
+    FormBuilder,
+    MessageService
   ],
   bootstrap: [AppComponent]
 })

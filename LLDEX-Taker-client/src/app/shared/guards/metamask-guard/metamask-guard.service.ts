@@ -3,6 +3,9 @@ import { ActivatedRouteSnapshot, CanActivate, Router, RouterStateSnapshot, UrlTr
 import { Observable } from 'rxjs';
 import { WEB3PROVIDER } from '../../services/provider/provider.service';
 import { BlockchainService } from '../../services/blockchain/blockchain.service';
+import { DialogService } from 'primeng/dynamicdialog';
+import { NoExtensionInstalledDialogComponent } from '../../components/no-extension-installed-dialog/no-extension-installed-dialog.component';
+import { MessageService } from 'primeng/api';
 
 @Injectable({
   providedIn: 'root'
@@ -10,16 +13,21 @@ import { BlockchainService } from '../../services/blockchain/blockchain.service'
 export class MetamaskGuardService implements CanActivate{
 
   constructor(private blockchainService: BlockchainService,
-              private router: Router) { }
+              private router: Router,
+              private messageService: MessageService) { }
 
   canActivate(route: ActivatedRouteSnapshot,
-              state: RouterStateSnapshot): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
-    return new Promise((resolve) => {
-      if(this.blockchainService.isLogged()){
-        return resolve(true);
+              state: RouterStateSnapshot): boolean {
+      if(this.blockchainService.isExtensionInstalled()){
+        return true;
       }
-      this.router.navigate(['/']);
+      this.router.navigate(['/']).then(() => {
+        this.messageService.add({
+          severity: "warn",
+          summary: "Warning",
+          detail: "No wallet extension is installed"
+        })
+      });
       return false;
-    })
   }
 }

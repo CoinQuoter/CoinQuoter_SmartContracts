@@ -2,8 +2,8 @@ import { Injectable } from '@angular/core';
 import { ethers } from 'ethers';
 import { ProviderService } from '../provider/provider.service';
 import { ELocalstorageNames } from '../../enums/localstorage-names.constants';
+import { LIMITORDERPROTOCOL_ADDRESS } from '../../constants/config.constants';
 
-const lopAddress = "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690";
 const ABILOP: string[] = [
   "function session(address owner) external view returns(address taker, address sessionKey, uint256 expirationTime, uint256 txCount)",
   "function createOrUpdateSession(address sessionKey, uint256 expirationTime) external returns(int256)",
@@ -20,13 +20,14 @@ const ABILOP: string[] = [
 })
 export class SessionService {
 
-  sessionTimeLeft: string;
+  session: boolean;
 
-  constructor(private providerService: ProviderService,) { }
+  constructor(private providerService: ProviderService,) {
+  }
 
 
   async createSession(date: Date) {
-    const LOPContract = new ethers.Contract(lopAddress, ABILOP, this.providerService);
+    const LOPContract = new ethers.Contract(LIMITORDERPROTOCOL_ADDRESS, ABILOP, this.providerService);
     const signer = this.providerService.getSigner(0);
     const wallet = ethers.Wallet.createRandom();
     const expirationTime = Math.round(date.getTime()/1000);
@@ -34,7 +35,7 @@ export class SessionService {
     const result = await LOPContract.connect(signer).createOrUpdateSession(wallet.address, expirationTime);
     await this.providerService.waitForTransaction(result.hash);
 
-    localStorage.setItem(ELocalstorageNames.SESSION_EXPIRE_TIME, date.toString());
+    // localStorage.setItem(ELocalstorageNames.SESSION_EXPIRE_TIME, date.toString());
     localStorage.setItem(ELocalstorageNames.SESSION_TAKER, JSON.stringify({
       session_private_key: wallet.privateKey,
       session_public_key: wallet.address,
@@ -43,7 +44,7 @@ export class SessionService {
   }
 
   async endSession() {
-    const LOPContract = new ethers.Contract(lopAddress, ABILOP, this.providerService);
+    const LOPContract = new ethers.Contract(LIMITORDERPROTOCOL_ADDRESS, ABILOP, this.providerService);
     const signer = this.providerService.getSigner(0);
 
     const result = await LOPContract.connect(signer).endSession();
@@ -53,7 +54,22 @@ export class SessionService {
   }
 
   isSession() {
-    return this.getTimeLeft() > 0;
+    // console.log(this.session);
+    // if(typeof this.session === 'undefined'){
+    //
+    // }
+    // const LOPContract = this.getLOPContract();
+    // const signer = this.providerService.getSigner(0);
+    // signer.getAddress().then((address) => {
+    //   LOPContract.connect(signer).sessionExpirationTime(address).then((expirationTime) => {
+    //     const expirationDate = new Date(Number(expirationTime.toString()) * 1000);
+    //     const dateNow = new Date().getTime() / 1000;
+    //     if (expirationTime > dateNow) {
+    //       session = true;
+    //     }
+    //   })
+    // });
+    return this.session;
   }
 
   getTimeLeft() {
@@ -61,9 +77,9 @@ export class SessionService {
     return new Date(time).getTime() - new Date().getTime()
   }
 
-  getExpirationTimeStamp() {
-    return localStorage.getItem(ELocalstorageNames.SESSION_EXPIRE_TIME);
-  }
+  // getExpirationTimeStamp() {
+  //   return localStorage.getItem(ELocalstorageNames.SESSION_EXPIRE_TIME);
+  // }
 
   clearStorage() {
     localStorage.removeItem(ELocalstorageNames.SESSION_EXPIRE_TIME);
@@ -72,5 +88,13 @@ export class SessionService {
 
   getSessionDetails() {
     return JSON.parse(localStorage.getItem(ELocalstorageNames.SESSION_TAKER));
+  }
+
+  getLOPContract() {
+    return new ethers.Contract(LIMITORDERPROTOCOL_ADDRESS, ABILOP, this.providerService);
+  }
+
+  setIsSession(val: boolean) {
+    this.session = val;
   }
 }

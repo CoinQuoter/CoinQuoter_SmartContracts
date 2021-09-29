@@ -1,22 +1,44 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">LLDEX</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarColor03" aria-controls="navbarColor03" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-
-    <div class="navbar">
-      <div class="navbar-nav me-auto">
-        <div class="bg-danger text-white mx-5 p-2 px-3 rounded-pill btn" *ngIf="!session" >No session</div>
-        <div class="mx-5 p-2 px-3 rounded-pill btn btn-success" *ngIf="session" (click)="op.toggle($event)">
-          Session time left: {{ getCountdown() }}
-        </div>
+<nav class="py-5 px-12">
+  <div class="container mx-auto flex justify-between items-center">
+    <div class="flex items-center">
+      <div><a routerLink="/"><h2 class="font-bold text-xl">LLDEX</h2></a></div>
+      <div class="flex gap-x-8 pl-24">
+        <a href="#" routerLink="/" class="block text-gray-500">Streaming</a>
+        <a href="#" routerLink="/transaction-details" class="block text-gray-500">Trade</a>
+        <a href="#" class="block text-gray-500">Transaction history</a>
+        <a href="#" class="block text-gray-500">Settings</a>
       </div>
     </div>
+
+    <div class="flex gap-x-5">
+      <div class="px-5 pt-2.5 pb-2 bg-red-700 rounded-full text-white cursor-pointer"
+           *ngIf="!isWalletConnected()"
+           (click)="connectToWallet()" >
+        Connect to a wallet
+      </div>
+
+      <div class="px-5 pt-2.5 pb-1.5 bg-red-700 rounded-full text-white cursor-pointer hover:bg-red-800"
+           *ngIf="!session && isWalletConnected()" (click)="showCreateSessionDialog()">
+        Start session
+      </div>
+
+
+      <div *ngIf="session" (click)="op.toggle($event)" class="px-5 pt-2 pb-1.5 border-2 border-gray-500 rounded-full text-gray-700 cursor-pointer font-bold flex">
+        {{ getCountdown() }}
+      </div>
+
+      <div class="border-2 border-l-0 border-gray-500 rounded-full text-gray-700 cursor-pointer font-bold flex"
+           [title]="walletAddress"
+           *ngIf="isWalletConnected()">
+        <div class="py-2 px-5 bg-gray-700 rounded-full">&nbsp;</div>
+        <div class="py-2 px-3">{{ shortWalletAddress }}</div>
+      </div>
+    </div>
+
   </div>
 </nav>
 <p-overlayPanel #op>
-  <ng-template pTemplate *ngIf="session">
+  <ng-template pTemplate>
     <div class="text-center">Your address</div>
     <div class="text-center"><strong>{{ address }}</strong></div>
 
@@ -29,8 +51,9 @@
     <div class="text-center mt-3">Expires in</div>
     <div class="text-center"><strong>{{ getCountdown() }}</strong></div>
 
-    <div class="mt-3">
-      <button class="btn btn-danger w-100" (click)="endSession()">Terminate session</button>
+    <div class="flex justify-center mt-4">
+      <button class="px-3 py-2 bg-red-700 text-white rounded hover:bg-red-800" (click)="endSession()">Terminate session</button>
     </div>
   </ng-template>
 </p-overlayPanel>
+<p-toast></p-toast>

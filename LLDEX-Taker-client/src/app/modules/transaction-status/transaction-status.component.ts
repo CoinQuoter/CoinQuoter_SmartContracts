@@ -25,6 +25,12 @@ export class TransactionStatusComponent implements OnInit {
   config: ConnectionInfo;
   data: any;
   type: number;
+  sellToken: string;
+  buyToken: string;
+  sellBalance: number;
+  buyBalance: number;
+  price: number;
+  gasPrice: number;
 
   constructor(private tradeDataService: TradeDataService,
               private executionDataService: ExecutionDataService,
@@ -32,7 +38,7 @@ export class TransactionStatusComponent implements OnInit {
               private blockchainService: BlockchainService) { }
 
   ngOnInit(): void {
-    this.status = "Pending";
+    this.status = "pending";
     this.tradeDate = new Date();
     const executionData = this.executionDataService.getData();
     const tradeData = this.tradeDataService.getData();
@@ -42,19 +48,23 @@ export class TransactionStatusComponent implements OnInit {
     this.pubnubService.connect(this.config).addListener({message: async event => {
           const message = event.message.content;
           this.data = event.message.content.data;
-          if(message.type == "transaction_posted") this.status = "Posted";
-          else if(message.type == "transaction_filled") this.status = "Filled";
-          else if(message.type == "transaction_failed") this.status = "Failed";
+          console.log(this.data);
+          if(message.type == "transaction_posted") this.status = "posted";
+          else if(message.type == "transaction_filled") this.status = "confirmed";
+          else if(message.type == "transaction_failed") this.status = "failed";
+          else if(message.type == "transaction_rejected") this.status = "rejected";
       }});
 
     [this.base, this.quote] = tradeData.pair.split("/");
-    this.bidPrice = tradeData.bid;
-    this.askPrice = tradeData.ask;
     this.sellAmount = executionData.sellAmount;
     this.buyAmount = executionData.buyAmount;
-    this.type = tradeData.type;
-    this.action = this.type == EOperationType.BID ? "Sell" : "Buy";
-
+    this.sellToken = executionData.sellToken;
+    this.buyToken = executionData.buyToken;
+    this.sellBalance = executionData.sellBalance;
+    this.buyBalance = Math.floor(executionData.buyBalance);
+    this.price = executionData.price;
+    this.type = executionData.type;
+    this.gasPrice = executionData.gasPrice;
 
     this.blockchainService.publishMessageToMaker(this.type, this.data, this.sellAmount, this.buyAmount, this.config);
   }
