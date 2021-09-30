@@ -22,7 +22,7 @@ import * as PubNub from "pubnub";
 export const ONE_USDT: ConnectionInfo = {
   title: "WONE/1USDT",
   settings: {
-    channels: ['one-usdt-11'],
+    channels: ['one-usdt-10'],
     withPresence: true
   }
 }
