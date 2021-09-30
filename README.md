@@ -7,8 +7,6 @@
 ### **VIDEO WORKFLOW** **https://youtu.be/AHTmGUyWqWI**
 ### **Docs** **https://docs.lldex.org/**
 
-Full documentation of the project can be found on: https://docs.lldex.org/
-
 Connect with us on social media to stay up to date:
 * [Twitter](https://twitter.com/kamilchels)
 * [Discord](https://discord.gg/UjBjFmVa)
