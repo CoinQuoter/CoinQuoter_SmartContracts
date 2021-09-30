@@ -96,16 +96,17 @@
 <!--  </div>-->
 <!--</form>-->
 <div class="flex justify-center mt-12">
-  <div class="rounded bg-white w-1/4 py-1 px-4 border border-gray-400"  style="max-width: 425px">
+  <div class="rounded bg-dark w-1/4 py-1 px-4"  style="max-width: 475px">
     <form action="" class="my-4" [formGroup]="form">
       <div class="flex justify-between items-center">
-        <h2 class="font-bold text-xl">Trade</h2>
-        <i class="pi pi-cog"></i>
+        <h2 class="font-bold text-white text-xl">Trade</h2>
+        <i class="pi pi-cog text-gray-400"></i>
       </div>
       <div class="my-5">
         <label for="pair" class="text-gray-400 text-sm">Pair</label>
         <p-dropdown
-          styleClass="w-full px-2 text-black"
+          styleClass="w-full px-2"
+          panelStyleClass="text-white bg-dark-light"
           formControlName="currencyPair"
           [options]="currencies"
           id="pair"
@@ -113,42 +114,42 @@
       </div>
       <div class="my-5">
         <p class="text-gray-400 text-sm">Indicative quotes</p>
-        <div class="rounded border border-gray-400 flex">
+        <div class="rounded border border-gray-800 flex">
           <div class="w-2/4 text-center py-1">
-            <div class="font-bold text-lg">{{ bidRate == 0 ? '-' : (bidRate | number)}}</div>
-            <div class="font-bold text-sm text-gray-500">BID</div>
+            <div class="font-bold text-lg text-white">{{ bidRate == 0 ? '-' : (bidRate | number)}}</div>
+            <div class="font-semibold text-sm text-gray-500">BID</div>
           </div>
-          <div class="w-2/4 text-center border-0 border-l border-gray-400 py-1">
-            <div class="font-bold text-lg">{{ askRate == 0 ? '-' : (askRate | number)}}</div>
-            <div class="font-bold text-sm text-gray-500">ASK</div>
+          <div class="w-2/4 text-center border-0 border-l border-gray-800 py-1">
+            <div class="font-bold text-lg text-white">{{ askRate == 0 ? '-' : (askRate | number)}}</div>
+            <div class="font-semibold text-sm text-gray-500">ASK</div>
           </div>
         </div>
       </div>
       <div class="my-5">
         <p class="text-gray-400 text-sm">Side</p>
-        <div class="rounded border border-gray-400 flex items-center">
-          <div class="w-2/4 text-center pt-3 pb-2.5 text-sm font-bold hover:bg-gray-200"
+        <div class="rounded flex items-center">
+          <div class="w-2/4 text-center pt-3 pb-2.5 text-sm font-semibold text-white"
                (click)="changeCurrencySides(1)"
                [ngClass]="isOperationSelected(1)
-                ? 'bg-gray-700 text-white hover:bg-gray-700 cursor-default' : 'text-gray-600 cursor-pointer '">
+                ? 'bg-main hover:bg-main cursor-default' : 'cursor-pointer  hover:bg-main-dark bg-dark-light'">
             SELL {{base}} / BUY {{quote}}
           </div>
-          <div class="w-2/4 text-center pt-3 pb-2.5 text-sm border-0 border-l border-gray-400 font-bold hover:bg-gray-200"
+          <div class="w-2/4 text-center pt-3 pb-2.5 text-sm font-semibold hover:bg-main-dark text-white"
                (click)="changeCurrencySides(2)"
                 [ngClass]="isOperationSelected(2)
-                ? 'bg-gray-700 text-white hover:bg-gray-700 cursor-default' : 'text-gray-600 cursor-pointer '">
+                ? 'bg-main hover:bg-main cursor-default' : 'cursor-pointer  hover:bg-main-dark bg-dark-light'">
             SELL {{quote}} / BUY {{base}}
           </div>
         </div>
       </div>
       <div class="my-5">
         <label for="amount" class="text-gray-400 text-sm">I sell</label><br/>
-        <div class="border border-gray-400 rounded h-10 flex items-center">
+        <div class="bg-dark-light rounded h-10 flex items-center">
           <input type="number"
                  id="amount"
-                 class="h-full w-4/5 px-3 rounded"
+                 class="h-full w-4/5 px-3 rounded bg-dark-light text-white focus:outline-none"
                  formControlName="sellAmount">
-          <div class="text-right w-1/5 pr-3 font-bold">{{sellToken}}</div>
+          <div class="text-right w-1/5 pr-3 font-semibold bg-dark-light text-white">{{sellToken}}</div>
         </div>
         <div class="text-sm font-semibold text-red-800 py-1">
           <div *ngIf="form.controls.sellAmount.hasError('sellTokenBalance')">Balance exceeded</div>
@@ -157,38 +158,38 @@
       </div>
 
       <div class="flex justify-between text-sm mb-2">
-        <div>Gas fee: </div>
-        <div >~ <span class="font-bold">{{ gasPrice.toFixed(8) }} {{ sellToken }}</span></div>
+        <div class="text-gray-400">Gas fee: </div>
+        <div class="text-white">~ <span class="font-semibold">{{ gasPrice | number: '.0-8' }} {{ sellToken }}</span></div>
       </div>
 
       <div class="flex justify-between text-sm my-2">
-        <div>Amount to convert: </div>
-        <div>~ <span class="font-bold">{{ (form.controls.sellAmount.value - gasPrice).toFixed(8) }} {{ sellToken }}</span></div>
+        <div class="text-gray-400">Amount to convert: </div>
+        <div class="text-white">~ <span class="font-semibold">{{ (form.controls.sellAmount.value - gasPrice) | number: '.0-8' }} {{ sellToken }}</span></div>
       </div>
       <div class="flex justify-between text-sm my-2" *ngIf="isWalletConnected()">
-        <div>Balance: </div>
-        <div class="font-bold">{{ sellBalance }} {{ sellToken }}</div>
+        <div class="text-gray-400">Balance: </div>
+        <div class="font-semibold text-white">{{ sellBalance | number: '.0-8' }} {{ sellToken }}</div>
       </div>
       <div class="mt-6">
-        <button type="button" class="py-2.5 w-full bg-gray-700 text-white rounded hover:bg-gray-600"
+        <button type="button" class="py-2.5 w-full bg-main text-white rounded hover:bg-main-light"
                 *ngIf="!isWalletConnected()"
                 (click)="connectToWallet()">Connect to a wallet</button>
 
-        <button type="button" class="py-2.5 w-full bg-gray-700 text-white rounded hover:bg-gray-600"
+        <button type="button" class="py-2.5 w-full bg-main text-white rounded hover:bg-main-light"
                 (click)="showCreateSessionDialog()"
                 *ngIf="isWalletConnected() && !isSession() && !form.controls.sellAmount.hasError('allowance')"
                 >Start session</button>
 
-        <button type="button" class="py-2.5 w-full bg-gray-700 text-white rounded disabled:opacity-50 hover:bg-gray-600"
+        <button type="button" class="py-2.5 w-full bg-main text-white rounded disabled:opacity-50 hover:bg-main-light"
                 (click)="showAllowanceDialog()"
                 *ngIf="form.controls.sellAmount.hasError('allowance')"
                 [disabled]="blockButton"
                 >Approve {{ sellToken }}</button>
 
-        <button type="button" class="py-2.5 w-full bg-gray-700 text-white rounded disabled:opacity-50 hover:bg-gray-600"
+        <button type="button" class="py-2.5 w-full bg-main text-white rounded disabled:opacity-50 hover:bg-main-light"
                 (click)="getQuote()"
                 *ngIf="isWalletConnected() && isSession() && !form.controls.sellAmount.hasError('allowance')"
-                [disabled]="!form.controls.sellAmount.valid || blockButton"
+                [disabled]="!form.controls.sellAmount.valid || blockButton || form.controls.sellAmount.value <= 0"
                 > Get quote</button>
       </div>
     </form>

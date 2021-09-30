@@ -57,52 +57,50 @@
 <!--  </div>-->
 <!--</div>-->
 <div class="flex justify-center mt-12">
-  <div class="rounded bg-white w-1/4 py-1 px-4 border border-gray-400"  style="max-width: 425px">
-    <div class="flex flex-col justify-center items-center my-4">
-      <div class="py-3">
+  <div class="rounded bg-dark w-1/4 px-4 text-white"  style="max-width: 475px">
+    <div class="flex flex-col justify-center items-center mt-1 mb-4 py-4">
         <p-progressSpinner *ngIf="status == 'pending' || status == 'posted'"
                            strokeWidth="3"
                            [style]="{'height': '40px', 'width' : '40px'}">
         </p-progressSpinner>
-      </div>
-      <i class="pi pi-check-circle text-green-800 py-3"
-         style="font-size: 2.5rem"
-         *ngIf="status == 'confirmed'"></i>
-      <i class="pi pi-times-circle text-red-800 py-3"
-         style="font-size: 2.5rem" *ngIf="status == 'rejected'"></i>
-      <h2 class="font-bold text-xl">Transaction {{status.toLowerCase()}}
-      </h2>
+        <i class="pi pi-check-circle text-green-800 py-1"
+           style="font-size: 2.5rem"
+           *ngIf="status == 'confirmed'"></i>
+        <i class="pi pi-times-circle text-red-800 py-1"
+           style="font-size: 2.5rem" *ngIf="status == 'rejected'"></i>
+        <h2 class="font-bold text-xl">Transaction {{status.toLowerCase()}}
+        </h2>
     </div>
     <div class="flex flex-wrap">
       <div class="w-1/2 text-center py-2.5">
-        <div class="text-gray-500">You pay</div>
-        <div class="font-bold text-lg">{{sellAmount.toFixed(8)}} {{sellToken}}</div>
-        <div class="text-gray-500 text-sm">(incl. {{ gasPrice.toFixed(8) }} gas fee)</div>
-      </div>
-      <div class="w-1/2 text-center py-2.5 border-l border-gray-300">
-        <div class="text-gray-500">You receive</div>
-        <div class="font-bold text-lg">{{buyAmount.toFixed(8)}} {{buyToken}}</div>
+        <div class="text-gray-400">You pay</div>
+        <div class="font-bold text-lg">{{sellAmount | number: '.0-8'}} {{sellToken}}</div>
+        <div class="text-gray-400 text-sm">(incl. {{ gasPrice.toFixed(8) }} gas fee)</div>
       </div>
       <div class="w-1/2 text-center py-2.5">
-        <div class="text-gray-500">Balance after trade</div>
-        <div class="font-bold text-lg">{{sellBalance.toFixed(8)}} {{sellToken}}</div>
+        <div class="text-gray-400">You receive</div>
+        <div class="font-bold text-lg">{{buyAmount | number: '.0-8'}} {{buyToken}}</div>
       </div>
-      <div class="w-1/2 text-center py-2.5 border-l border-gray-300">
-        <div class="text-gray-500">Balance after trade</div>
-        <div class="font-bold text-lg">{{buyBalance.toFixed(8)}} {{buyToken}}</div>
+      <div class="w-1/2 text-center py-2.5">
+        <div class="text-gray-400">Balance after trade</div>
+        <div class="font-bold text-lg">{{sellBalance | number: '.0-8'}} {{sellToken}}</div>
+      </div>
+      <div class="w-1/2 text-center py-2.5">
+        <div class="text-gray-400">Balance after trade</div>
+        <div class="font-bold text-lg">{{buyBalance | number: '.0-8'}} {{buyToken}}</div>
       </div>
     </div>
     <div class="text-center mt-12 mb-8 font-bold text-2xl">
       Price: {{ price }}
     </div>
     <div class="text-center my-4">
-      <a href="#" class="underline text-gray-500 hover:text-gray-800 font-semibold">Go to transaction history</a>
+      <a href="#" class="underline text-gray-400 hover:text-gray-600 font-semibold">Go to transaction history</a>
     </div>
     <div class="text-center my-4" *ngIf="status == 'confirmed'">
-      <a href="https://explorer.harmony.one/tx/{{hash}}" target="_blank" class="underline text-gray-500 hover:text-gray-800 font-semibold">View on Etherscan</a>
+      <a href="https://explorer.harmony.one/tx/{{hash}}" target="_blank" class="underline text-gray-400 hover:text-gray-600 font-semibold">View on Etherscan</a>
     </div>
     <div class="my-5">
-      <button class="py-3 px-4 w-full bg-gray-700 text-white rounded hover:bg-gray-600" routerLink="/">Close</button>
+      <button class="py-3 px-4 w-full bg-main text-white rounded hover:bg-main-light" routerLink="/">Close</button>
     </div>
   </div>
 </div>

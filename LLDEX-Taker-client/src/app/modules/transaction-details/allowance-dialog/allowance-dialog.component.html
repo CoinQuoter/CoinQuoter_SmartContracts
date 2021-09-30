@@ -1,5 +1,5 @@
 <form class="w-100" [formGroup]="form">
-    <div class="text-center mb-5">
+    <div class="text-center mb-5 text-gray-400">
       Approve {{ currencyName }} to allow trade settlement up to approved amount.
     </div>
     <div class="my-5 mb-7 flex justify-center">
@@ -9,7 +9,7 @@
 <!--                       [step]="0.001"-->
 <!--                       [min]="0"></p-inputNumber>-->
       <input type="number"
-             class="py-2.5 px-2 w-40 border border-gray-700 rounded text-center text-lg"
+             class="py-2.5 px-4 w-40 rounded bg-dark-light text-white focus:outline-none"
              placeholder="Allowance"
              formControlName="amount"/>
     </div>
