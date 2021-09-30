@@ -22,36 +22,6 @@ export default class Config {
     static signWithPrivateKey: boolean = true;
     
     static pairs: TokenPair[] = [
-        // Ropsten
-        // {
-        //     token0: "0x860aa68b0644b1533bb5e0a988cf57b0ebdeb780",
-        //     token1: "0x4d77f4791cf9e10a4d905346a189d0da58895125",
-        //     token0Dec: 18,
-        //     token1Dec: 18,
-        //     slippage: new Decimal("0.0005"),
-        //     spreadBid: new Decimal("0.5"),
-        //     spreadAsk: new Decimal("0.7"),
-        //     maxToken0: new Decimal("10.0"),
-        //     maxToken1: new Decimal("15000.0"),
-        //     mappingBinance: "bnbusdt",
-        //     channelName: "one-usdt-10"
-        // },
-
-        // Local hardhat
-        // {
-        //         token0: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
-        //         token1: "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
-        //         token0Dec: 18,
-        //         token1Dec: 18,
-        //         slippage: new Decimal("0.0005"),
-        //         spreadBid: new Decimal("0.5"),
-        //         spreadAsk: new Decimal("0.7"),
-        //         maxToken0: new Decimal("10.0"),
-        //         maxToken1: new Decimal("15000.0"),
-        //         mappingBinance: "bnbusdt",
-        //         channelName: "one-usdt-10"
-        //     },
-
     // Harmony mainnet
     {
         token0: "0xcf664087a5bb0237a0bad6742852ec6c8d69a27a",

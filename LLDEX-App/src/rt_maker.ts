@@ -20,6 +20,7 @@ import { DealBlotterRow } from './models/deal_blotter_row';
 import BinanceConfig from './utils/binance_config';
 import { hasUncaughtExceptionCaptureCallback } from 'process';
 import { PostedTransaction } from './models/posted_transaction';
+import { delay } from 'lodash';
 
 var createHmac = require('create-hmac')
 
@@ -49,7 +50,6 @@ pubnubClient.addListener({
 
         if (evtData.type == 'action' && evtData.method == 'execute_order') {
             const messageFrom = event.publisher;
-            console.log(messageFrom);
 
             _confirmOrder(
                 evtData.data, 
@@ -169,17 +169,11 @@ async function _confirmOrder(
             return;
         }
 
-        console.log(JSON.stringify(data.limitOrder, null, 2));
-        console.log("Taker amount" + takerAmount);
-        console.log("Maker amount" + makerAmount);
-        console.log("Signature" + data.limitOrderSignature);
-        console.log("Signer" + await signer.getAddress());
-
         const result = await contract.connect(signer).fillOrderRFQ(
             data.limitOrder,
             data.limitOrderSignature,
-            0,
-            0,
+            takerAmount,
+            makerAmount,
             {gasLimit: 1000000}
         )
 
@@ -194,7 +188,6 @@ async function _confirmOrder(
         });
         const receipt = await provider.waitForTransaction(result.hash)
 
-        console.log(receipt);
         if (receipt.status == 0) {
             txFail(
                 pair.channelName, 
@@ -280,9 +273,6 @@ async function _binanceCreateOrder(pair: TokenPair, order: RFQOrder): Promise<bo
         });
 
         var endTime = performance.now()
-
-        console.log(`Call to binance took ${endTime - startTime} milliseconds`)
-        console.log('Order filled: ' + JSON.stringify(result, null, 2));
 
         return true;
     } catch(err) {
@@ -380,25 +370,20 @@ function _validateOrder(pair: TokenPair, order: RFQOrder, blotterRow: DealBlotte
 
     const orderType: OrderType = order.takerAsset == pair.token0 ? OrderType.bid : OrderType.ask
     
-    const amountToken0 = new Decimal(takerAssetData.amount)
+    var amountToken0 = new Decimal(takerAssetData.amount)
         .div(new Decimal(10)
         .pow(orderType == OrderType.bid ? pair.token0Dec: pair.token1Dec))
 
-    const amountToken1 = new Decimal(makerAssetData.amount)
+    var amountToken1 = new Decimal(makerAssetData.amount)
         .div(new Decimal(10)
         .pow(orderType == OrderType.bid ? pair.token1Dec: pair.token0Dec))
-
-    console.log("takerAssetData.amount: " + takerAssetData.amount);
-    console.log("makerAssetData.amount: " + makerAssetData.amount);
-    console.log("Pair token 1 dec: " + pair.token1Dec);
-    console.log("Pair token 0 dec: " + pair.token0Dec);
 
     const price = orderType == OrderType.bid ? 
         amountToken1.div(amountToken0) : 
         amountToken0.div(amountToken1)
 
-    const blotterAmountToken0 = orderType == OrderType.bid ? amountToken0 : amountToken1;
-    const blotterAmountToken1 = orderType == OrderType.bid ? amountToken1 : amountToken0;
+    const blotterAmountToken0 = amountToken0;
+    const blotterAmountToken1 = amountToken1;
 
     blotterRow.takerAddress = takerAssetData.fromAddress;
     blotterRow.orderType = OrderType[orderType];
@@ -407,6 +392,13 @@ function _validateOrder(pair: TokenPair, order: RFQOrder, blotterRow: DealBlotte
     blotterRow.price = price.toFixed(5);
 
     var rejectMaxAmount: boolean = false
+
+    if (orderType == OrderType.ask) {
+        const t = amountToken0;
+
+        amountToken0 = amountToken1;
+        amountToken1 = t;
+    }
 
     if (amountToken0.greaterThan(pair.maxToken0)) {
         publishMessage(pair.channelName, 'transaction_rejected', {
@@ -478,11 +470,14 @@ async function txSuccess(channel: string, hash: String) {
     Config.pairs.forEach(async function(pair) {
         const streamingPrices: boolean = $(`#start-${pair.mappingBinance}`).is(':checked')
 
-        if (streamingPrices && !await _validateBalance(pair)) {
-            _stopStreamingPrices(pair);
+         delay(async function () {
+            if (streamingPrices && !await _validateBalance(pair)) {
+                _stopStreamingPrices(pair);
 
-            return;
-        }
+                return;
+            }
+        }, 1000)
+
     })
 }
 
@@ -596,7 +591,6 @@ function _initalizeLOPEvents() {
             OrderType.bid : 
             OrderType.ask
 
-
         const amountToken0 = new Decimal(takerAssetData.amount)
             .div(new Decimal(10)
             .pow(orderType == OrderType.bid ? transaction.pair.token0Dec: transaction.pair.token1Dec))
@@ -605,8 +599,8 @@ function _initalizeLOPEvents() {
             .div(new Decimal(10)
             .pow(orderType == OrderType.bid ? transaction.pair.token1Dec: transaction.pair.token0Dec))
 
-        $(`#${hash}-amount-in`).text($(`#${hash}-amount-in`).text() + '\n(' + (orderType == OrderType.bid ? amountToken0.toFixed(5) : amountToken1.toFixed(5)) + ')');
-        $(`#${hash}-amount-out`).text($(`#${hash}-amount-out`).text() + '\n(' + (orderType == OrderType.bid ? amountToken1.toFixed(5) : amountToken0.toFixed(5)) + ')');
+        $(`#${hash}-amount-in`).text($(`#${hash}-amount-in`).text() + '\n(' + amountToken0.toFixed(5) + ')');
+        $(`#${hash}-amount-out`).text($(`#${hash}-amount-out`).text() + '\n(' + amountToken1.toFixed(5) + ')');
     });
 }
 
@@ -863,14 +857,16 @@ function _attachEventsToPair(pair: TokenPair) {
 
     $(`#${pair.mappingBinance}-max-token0`).on('change', function () {
         const maxToken0 = new Decimal($(`#${pair.mappingBinance}-max-token0`).val() + '')
-
         pair.maxToken0 = new Decimal(maxToken0);
+
+        _validateBalance(pair);
     });
 
     $(`#${pair.mappingBinance}-max-token1`).on('change', function () {
         const maxToken1 = new Decimal($(`#${pair.mappingBinance}-max-token1`).val() + '')
-
         pair.maxToken1 = new Decimal(maxToken1);
+
+        _validateBalance(pair);
     });
 
     $(`#${pair.mappingBinance}-update-allowance-token0`).on('click', async function() {
@@ -1060,13 +1056,25 @@ async function _validateBalance(pair: TokenPair): Promise<boolean> {
     const tokenContract0 = new ethers.Contract(pair.token0, ERC20ABI, provider)
     const tokenContract1 = new ethers.Contract(pair.token1, ERC20ABI, provider)
 
-    const maxToken0 = BigNumber.from(pair.maxToken0.mul(new Decimal(10).pow(pair.token0Dec)).toFixed(0))
-    const maxToken1 = BigNumber.from(pair.maxToken1.mul(new Decimal(10).pow(pair.token1Dec)).toFixed(0))
+    const maxToken0 = new Decimal(pair.maxToken0.mul(new Decimal(10).pow(pair.token0Dec)).toFixed(0))
+    const maxToken1 = new Decimal(pair.maxToken1.mul(new Decimal(10).pow(pair.token1Dec)).toFixed(0))
 
-    const token0Balance = await tokenContract0.balanceOf(signerAddress)
-    const token1Balance = await tokenContract1.balanceOf(signerAddress)
-    const token0Allowance = await tokenContract0.allowance(signerAddress, Config.limitOrderProtocolAddress)
-    const token1Allowance = await tokenContract1.allowance(signerAddress, Config.limitOrderProtocolAddress)
+    const token0Balance = new Decimal((await tokenContract0.balanceOf(signerAddress)).toString())
+    const token1Balance = new Decimal((await tokenContract1.balanceOf(signerAddress)).toString())
+    const token0Allowance = new Decimal((await tokenContract0.allowance(signerAddress, Config.limitOrderProtocolAddress)).toString())
+    const token1Allowance = new Decimal((await tokenContract1.allowance(signerAddress, Config.limitOrderProtocolAddress)).toString())
+
+    const minToken0 = Decimal.min(token0Allowance, token0Balance, maxToken0)
+    const minToken1 = Decimal.min(token1Allowance, token1Balance, maxToken1)
+
+    const minToken0Scaled = minToken0.div(new Decimal(10).pow(pair.token0Dec));
+    const minToken1Scaled = minToken1.div(new Decimal(10).pow(pair.token1Dec))
+
+    $(`#${pair.mappingBinance}-max-token0`).val(minToken0Scaled.toFixed(8))
+    $(`#${pair.mappingBinance}-max-token1`).val(minToken1Scaled.toFixed(8))
+
+    pair.maxToken0 = minToken0Scaled; 
+    pair.maxToken1 = minToken1Scaled;
 
     if (maxToken0.gt(token0Balance) || maxToken0.gt(token0Allowance)) {
         $('<div>Token0 allowance or balance is lower than maximum order value</div>').dialog();
