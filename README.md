@@ -1,5 +1,4 @@
 # LLDEX 
-Made with love during **Harmony - Bridging TradFi To DeFi** hackathon
 *Track 1: Cross-Chain - “Liquidity” : https://gitcoin.co/issue/harmony-one/hackathon/18/100026313*
 
 ### **DEMO [Harmony Mainnet]** **[https://lldex.org/](https://lldex.org/)**
