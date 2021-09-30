@@ -1,6 +1,18 @@
-# LLDEX
+# LLDEX Submision to:
+# **Harmony - Bridging TradFi To DeFi**
 
-Full documentation of the project can be found on: https://lldex.gitbook.io/lldex/
+
+### **DEMO [Harmony Mainnet]** **[https://lldex.org/](https://lldex.org/)**
+
+
+### **VIDEO WORKFLOW** **https://youtu.be/AHTmGUyWqWI**
+
+
+## Challenges: 
+
+### *Track 1: Cross-Chain - “Liquidity” : https://gitcoin.co/issue/harmony-one/hackathon/18/100026313*
+
+Full documentation of the project can be found on: https://docs.lldex.org/
 
 Demo video: .....
 
