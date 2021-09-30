@@ -1,23 +1,12 @@
 # LLDEX Submision to:
 # **Harmony - Bridging TradFi To DeFi**
+## **Track 1: Cross-Chain - “Liquidity” : https://gitcoin.co/issue/harmony-one/hackathon/18/100026313*
 
 
 ### **DEMO [Harmony Mainnet]** **[https://lldex.org/](https://lldex.org/)**
-
-
 ### **VIDEO WORKFLOW** **https://youtu.be/AHTmGUyWqWI**
 
-
-## Challenges: 
-
-### *Track 1: Cross-Chain - “Liquidity” : https://gitcoin.co/issue/harmony-one/hackathon/18/100026313*
-
 Full documentation of the project can be found on: https://docs.lldex.org/
-
-Demo video: .....
-
-Low Latency DEX was designed during Harmony Hackathon: https://gitcoin.co/hackathon/harmony-defi/projects/9385/low-latency-p2p-dex
-Hacketon side note: Design of LLDEX allows for a very good integration with Hummingbot that was inicialy planed, but due to limited resources we decided to just focus on the core leaving integrations for a latter stages.
 
 Connect with us on social media to stay up to date:
 * [Twitter](https://twitter.com/kamilchels)
