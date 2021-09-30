@@ -15,6 +15,8 @@ import { HelperService } from '../../shared/services/helper/helper.service';
 import { EOperationType } from '../../shared/enums/operation-type.constants';
 import { TradeDataService } from '../../shared/services/trade-data/trade-data.service';
 import { FILLORDER_RFQ_ESTIMATED_GAS_USAGE } from '../../shared/constants/config.constants';
+import { } from '../../shared/extensions/to-significant-digits';
+import { take } from 'rxjs/operators';
 
 @Component({
   selector: 'app-transaction-details',
@@ -76,7 +78,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   }
 
   initVariables() {
-    this.approveAmount = 0;
+    this.approveAmount = 0.5;
     this.ethBalance = 0;
     this.baseBalance = 0;
     this.quoteBalance = 0;
@@ -103,8 +105,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
 
           this.helperService.setAccuracy(this.isOperationAsk() ? this.data.amount1Dec : this.data.amount0Dec);
 
-          this.gasPrice = (this.helperService.toNumber(await this.providerService.getGasPrice())
-            *FILLORDER_RFQ_ESTIMATED_GAS_USAGE);
+          this.gasPrice = (0 * FILLORDER_RFQ_ESTIMATED_GAS_USAGE);
           let sellTokenBalance = 0;
 
           if(this.isWalletConnected()){
@@ -127,7 +128,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
             this.sellBalance = this.isOperationAsk() ? buyBalance : sellBalance;
             sellTokenBalance = this.isOperationAsk() ? buyBalance : sellBalance;
           }
-          [this.bidRate, this.askRate] = [this.data.bid, this.data.ask];
+          [this.bidRate, this.askRate] = [this.data.bid.toString(), this.data.ask.toString()];
 
           const formSellAmount = this.form.get('sellAmount');
           formSellAmount.setValidators([
@@ -162,6 +163,11 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
       this.operation = this.isOperationAsk() ? EOperationType.BID : EOperationType.ASK;
       this.router.navigate([], {relativeTo: this.route, queryParams:
           { type: this.operation }, queryParamsHandling: 'merge'})
+
+      const formSellAmount = this.form.get('sellAmount');
+      formSellAmount.setValue(0)
+      formSellAmount.updateValueAndValidity({ onlySelf: false, emitEvent: true });
+      formSellAmount.markAsTouched();
     }
   }
 
@@ -183,6 +189,8 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
 
   changePair() {
     const pair = this.helperService.pairToParam(this.form.get('currencyPair').value);
+
+    this.clearTransactionData();
     this.router.navigate([], {relativeTo: this.route, queryParams:
         { pair: pair, type: this.operation }, queryParamsHandling: 'merge'});
     this.splitCurrencyPair();
@@ -193,18 +201,31 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
     this.getBasicContractsInfo();
   }
 
+  clearTransactionData() {
+    this.bidRate = 0;
+    this.askRate = 0;
+    this.sellBalance = 0;
+
+    this.form.get('sellAmount').setValue(0)
+  }
+
 
   showAllowanceDialog() {
     const ref = this.dialogService.open(AllowanceDialogComponent, {
       header: 'Allowance',
       width: '40vw',
       data: {
-        approveAmount: this.approveAmount,
+        approveAmount: this.form.get("sellAmount").value,
         currency: this.sellToken,
         clientInfo: this.data,
         operation: this.operation
       }
-    })
+    }).onClose.pipe(take(1)).subscribe(() => {
+        const formSellAmount = this.form.get('sellAmount');
+        formSellAmount.setValue(formSellAmount.value);
+        formSellAmount.updateValueAndValidity();
+        formSellAmount.markAsTouched();
+    });
   }
 
   showCreateSessionDialog() {

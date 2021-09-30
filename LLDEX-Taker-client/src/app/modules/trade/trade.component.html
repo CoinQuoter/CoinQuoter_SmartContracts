@@ -48,20 +48,20 @@
     <div class="flex flex-wrap">
       <div class="w-1/2 text-center py-2.5">
         <div class="text-gray-400">You pay</div>
-        <div class="font-bold text-lg text-white">{{sellAmount | number: '.0-8'}} {{sellToken}}</div>
-        <div class="text-gray-400 text-sm">(incl. {{ gasPrice | number: '.0-8' }} gas fee)</div>
+        <div class="font-bold text-lg text-white">{{sellAmount | number: '1.1-8'}} {{sellToken}}</div>
+        <div class="text-gray-400 text-sm">(incl. {{ gasPrice | number: '1.1-8' }} gas fee)</div>
       </div>
       <div class="w-1/2 text-center py-2.5">
         <div class="text-gray-400">You receive</div>
-        <div class="font-bold text-lg text-white">{{buyAmount | number: '.0-8'}} {{buyToken}}</div>
+        <div class="font-bold text-lg text-white">{{buyAmount | number: '1.1-8'}} {{buyToken}}</div>
       </div>
       <div class="w-1/2 text-center py-2.5">
         <div class="text-gray-400">Balance after trade</div>
-        <div class="font-bold text-lg text-white">{{baseBalance | number: '.0-8'}} {{sellToken}}</div>
+        <div class="font-bold text-lg text-white">{{baseBalance | number: '1.1-8'}} {{sellToken}}</div>
       </div>
       <div class="w-1/2 text-center py-2.5">
         <div class="text-gray-400">Balance after trade</div>
-        <div class="font-bold text-lg text-white">{{quoteBalance | number: '.0-8'}} {{buyToken}}</div>
+        <div class="font-bold text-lg text-white">{{quoteBalance | number: '1.1-8'}} {{buyToken}}</div>
       </div>
     </div>
     <div class="text-center mt-12 mb-8 font-bold text-2xl text-white">
