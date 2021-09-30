@@ -15,8 +15,18 @@ export default class Config {
         "event SessionUpdated(address indexed sender, address indexed sessionKey, uint256 expirationTime)",
     ]
 
-    static pubNubPublishKey: string = "pub-c-d009446b-b9de-41fa-8c2d-b779fd13ba58"
-    static pubNubSubscribeKey: string = "sub-c-790990b4-0c8e-11ec-9c1c-9adb7f1f2877"
+    /*
+        Maker quotes keyset
+    */
+    static pubNubQuotePublishKey: string = "pub-c-d009446b-b9de-41fa-8c2d-b779fd13ba58"
+    static pubNubQuoteSubscribeKey: string = "sub-c-790990b4-0c8e-11ec-9c1c-9adb7f1f2877"
+
+    /*
+        Order status keyset
+    */
+    static pubNubOrderPublishKey: string = "pub-c-ff397b4e-99d7-4995-90d1-bd157c6eb6c3"
+    static pubNubOrderSubscribeKey: string = "sub-c-c72e4772-21b4-11ec-925a-3eee4c94e219"
+
     static limitOrderProtocolAddress: string = "0xbFE71f56Fd7670BBB2C76A44067d633F1B44F765"
     static fillOrderRFQEstimatedGasUsage: number = 139333
     static signWithPrivateKey: boolean = true;
@@ -34,7 +44,7 @@ export default class Config {
         maxToken0: new Decimal("5.0"),
         maxToken1: new Decimal("0.5"),
         mappingBinance: "oneusdt",
-        channelName: "one-usdt-10"
+        channelName: "one-usdt-11"
     },
     {
         token0: "0xcf664087a5bb0237a0bad6742852ec6c8d69a27a",

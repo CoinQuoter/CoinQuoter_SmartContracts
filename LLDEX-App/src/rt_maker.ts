@@ -38,13 +38,19 @@ var streamLatestSnapshot: Map<string, BinanceStreamSnapshot> = new Map<string, B
 var postedTransactions: Map<string, PostedTransaction> = new Map<string, PostedTransaction>();
 
 const uuid = PubNub.generateUUID()
-const pubnubClient = new PubNub({
-    publishKey: Config.pubNubPublishKey,
-    subscribeKey: Config.pubNubSubscribeKey,
+const pubnubQuoteClient = new PubNub({
+    publishKey: Config.pubNubQuotePublishKey,
+    subscribeKey: Config.pubNubQuoteSubscribeKey,
     uuid: uuid
 })
 
-pubnubClient.addListener({
+// const pubnubOrdersClient = new PubNub({
+//     publishKey: Config.pubNubOrderPublishKey,
+//     subscribeKey: Config.pubNubOrderSubscribeKey,
+//     uuid: uuid
+// })
+
+pubnubQuoteClient.addListener({
     message: function (event) {
         const evtData = event.message.content
 
@@ -491,7 +497,7 @@ async function txFail(channel: string, hash: String, reason: String) {
 }
 
 function publishMessage(channel: string, type: string, data: any) {
-    pubnubClient.publish({
+    pubnubQuoteClient.publish({
         channel: channel,
         message: {
             content: {
@@ -501,7 +507,7 @@ function publishMessage(channel: string, type: string, data: any) {
             sender: uuid
         },
         meta: {
-            uuid: pubnubClient.getUUID()
+            uuid: pubnubQuoteClient.getUUID()
         }
     })
 }
@@ -605,7 +611,7 @@ function _initalizeLOPEvents() {
 }
 
 function _initializePubNub() {
-    pubnubClient.subscribe({
+    pubnubQuoteClient.subscribe({
         channels: Config.pairs.map(x => x.channelName),
         withPresence: true
     })
@@ -799,7 +805,7 @@ function _initBinanceStream(pair: TokenPair) {
         _updatePairWithSnapshot(pair, streamSnapshot);
 
         if (streamingPrices) {
-            pubnubClient.publish({
+            pubnubQuoteClient.publish({
                 channel: pair.channelName,
                 message: {
                     content: {
@@ -809,7 +815,7 @@ function _initBinanceStream(pair: TokenPair) {
                     sender: uuid
                 },
                 meta: {
-                    uuid: pubnubClient.getUUID()
+                    uuid: pubnubQuoteClient.getUUID()
                 }
             })
         }
