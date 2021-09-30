@@ -5,6 +5,7 @@
 
 ### **DEMO [Harmony Mainnet]** **[https://lldex.org/](https://lldex.org/)**
 ### **VIDEO WORKFLOW** **https://youtu.be/AHTmGUyWqWI**
+### **Docs** **https://docs.lldex.org/**
 
 Full documentation of the project can be found on: https://docs.lldex.org/
 
