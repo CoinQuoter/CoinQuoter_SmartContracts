@@ -55,7 +55,8 @@ export class BlockchainService {
     const tokenContract = new ethers.Contract(address, ABIERC20, this.providerService);
 
     const newAllowance = Number(allowance * Math.pow(10, decimals));
-    await tokenContract.connect(this.providerService.getSigner(0)).approve(data.contractAddress, newAllowance.toLocaleString('fullwide', {useGrouping:false}));
+    const result = await tokenContract.connect(this.providerService.getSigner(0)).approve(data.contractAddress, newAllowance.toLocaleString('fullwide', {useGrouping:false}));
+    await this.providerService.waitForTransaction(result.hash);
   }
 
   getERC20Contract(address: string) {

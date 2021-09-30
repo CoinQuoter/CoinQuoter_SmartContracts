@@ -115,11 +115,11 @@
         <p class="text-gray-400 text-sm">Indicative quotes</p>
         <div class="rounded border border-gray-400 flex">
           <div class="w-2/4 text-center py-1">
-            <div class="font-bold text-lg">{{ bidRate == 0 ? '-' : (bidRate | number)}}</div>
+            <div class="font-bold text-lg">{{ bidRate == 0 ? '-' : (bidRate | number : '1.2-6')}}</div>
             <div class="font-bold text-sm text-gray-500">BID</div>
           </div>
           <div class="w-2/4 text-center border-0 border-l border-gray-400 py-1">
-            <div class="font-bold text-lg">{{ askRate == 0 ? '-' : (askRate | number)}}</div>
+            <div class="font-bold text-lg">{{ askRate == 0 ? '-' : (askRate | number : '1.2-6')}}</div>
             <div class="font-bold text-sm text-gray-500">ASK</div>
           </div>
         </div>
@@ -152,23 +152,25 @@
         </div>
         <div class="text-sm font-semibold text-red-800 py-1">
           <div *ngIf="form.controls.sellAmount.hasError('sellTokenBalance')">Balance exceeded</div>
-          <div *ngIf="form.controls.sellAmount.hasError('liquidity')">Max available liquidity: {{ maxLiquidity.toFixed(8) }} {{sellToken}}</div>
+          <div *ngIf="form.controls.sellAmount.hasError('liquidity')">Max available liquidity: {{ maxLiquidity }} {{sellToken}}</div>
         </div>
+      </div>
+
+      <div class="flex justify-between text-sm my-2" style="padding-bottom: 20px;" *ngIf="isWalletConnected()">
+        <div>Balance: </div>
+        <div class="font-bold">{{ sellBalance | number : '1.1-6'}} {{ sellToken }}</div>
       </div>
 
       <div class="flex justify-between text-sm mb-2">
         <div>Gas fee: </div>
-        <div >~ <span class="font-bold">{{ gasPrice.toFixed(8) }} {{ sellToken }}</span></div>
+        <div >~ <span class="font-bold">{{ gasPrice | number : '1.0-6' }} {{ sellToken }}</span></div>
       </div>
 
       <div class="flex justify-between text-sm my-2">
         <div>Amount to convert: </div>
-        <div>~ <span class="font-bold">{{ (form.controls.sellAmount.value - gasPrice).toFixed(8) }} {{ sellToken }}</span></div>
+        <div>~ <span class="font-bold">{{ ((form.controls.sellAmount.value - gasPrice) | number : '1.0-6') }} {{ sellToken }}</span></div>
       </div>
-      <div class="flex justify-between text-sm my-2" *ngIf="isWalletConnected()">
-        <div>Balance: </div>
-        <div class="font-bold">{{ sellBalance }} {{ sellToken }}</div>
-      </div>
+
       <div class="mt-6">
         <button type="button" class="py-2.5 w-full bg-gray-700 text-white rounded hover:bg-gray-600"
                 *ngIf="!isWalletConnected()"
