@@ -11,6 +11,8 @@ Connect with us on social media to stay up to date:
 * [Twitter](https://twitter.com/kamilchels)
 * [Discord](https://discord.gg/UjBjFmVa)
 
+We have not managed to connect LLDEX with Hummibot, but LLDEX is perfectly fitted for that
+
 # What is LLDEX?
 
 ### Low Latency DEX Protocol
