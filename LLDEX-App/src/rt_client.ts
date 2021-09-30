@@ -1,4 +1,4 @@
-import { LimitOrderBuilder, LimitOrderPredicateBuilder, LimitOrderPredicateCallData, LimitOrderProtocolFacade, PrivateKeyProviderConnector, Web3ProviderConnector } from "limit-order-protocol-lldex";
+import { LimitOrderBuilder, PrivateKeyProviderConnector, Web3ProviderConnector } from "limit-order-protocol-lldex";
 import PubNub from "pubnub";
 import Web3 from "web3"
 import Decimal from 'decimal.js';
@@ -10,11 +10,10 @@ let allowanceFetched = false;
 
 let makerLastPacket: any;
 
-const lopAddress = "0xbFE71f56Fd7670BBB2C76A44067d633F1B44F765";
 const uuid_client = PubNub.generateUUID();
 const pubnub_client = new PubNub({
-    publishKey: "pub-dd76188a-d8cc-42cf-9625-335ef44bb3a1",
-    subscribeKey: "sub-4c298de8-a12e-11e1-bd35-5d12de0b12ad",
+    publishKey: "pub-c-d009446b-b9de-41fa-8c2d-b779fd13ba58",
+    subscribeKey: "sub-c-790990b4-0c8e-11ec-9c1c-9adb7f1f2877",
     uuid: uuid_client
 });
 
@@ -22,17 +21,6 @@ const ABIERC20: string[] = [
     "function allowance(address _owner, address _spender) public view returns (uint256 remaining)",
     "function approve(address _spender, uint256 _value) public returns (bool success)",
     "function balanceOf(address) view returns (uint)"
-];
-
-const ABILOP: string[] = [
-    "function session(address owner) external view returns(address taker, address sessionKey, uint256 expirationTime, uint256 txCount)",
-    "function createOrUpdateSession(address sessionKey, uint256 expirationTime) external returns(int256)",
-    "function sessionExpirationTime(address owner) external view returns(uint256 expirationTime)",
-    "function endSession() external",
-    "event OrderFilledRFQ(bytes32 orderHash, uint256 takingAmount)",
-    "event SessionTerminated(address indexed sender, address indexed sessionKey)",
-    "event SessionCreated(address indexed creator, address indexed sessionKey, uint256 expirationTime)",
-    "event SessionUpdated(address indexed sender, address indexed sessionKey, uint256 expirationTime)",
 ];
 
 enum TxType {
@@ -72,7 +60,7 @@ $(document).ready(async function () {
         const token0Contract = new ethers.Contract($("#token-sell").data("token"), ABIERC20, provider)
 
         const newAllowance = new Decimal($("#amount-in-approved").val().toString()).mul(new Decimal(10).pow($("#token-sell").data("tokenDecimals")))
-        await token0Contract.connect(provider.getSigner(0)).approve(makerLastPacket.contractAddress, newAllowance.toFixed())
+        await token0Contract.connect(provider.getSigner(0)).approve(makerLastPacket.contractAddress, newAllowance.toFixed(0))
     });
 
     if ($("#token-sell").prop('selectedIndex') == 0) {
@@ -96,7 +84,7 @@ $(document).ready(async function () {
     $("#private-key").prop("disabled", true);
 
     const provider = new ethers.providers.Web3Provider(window.ethereum)
-    const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
+    const LOPContract = new ethers.Contract(Config.limitOrderProtocolAddress, Config.limitOrderProtocolABI, provider)
 
     LOPContract.on("OrderFilledRFQ", (orderHash, takingAmount, event) => {
         console.log("OrderFilledRFQ", orderHash);
@@ -130,7 +118,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
 
 
     pubnub_client.subscribe({
-        channels: ['one-usdt-2'],
+        channels: ['eth-usdt-10'],
         withPresence: true
     });
 
@@ -196,8 +184,8 @@ window.addEventListener('DOMContentLoaded', (event) => {
             new Web3ProviderConnector(web3);
 
         let limitOrderBuilder: LimitOrderBuilder = new LimitOrderBuilder(
-            data.contractAddress,
-            31337,
+            Config.limitOrderProtocolAddress,
+            1,
             providerConnector
         );
 
@@ -209,15 +197,15 @@ window.addEventListener('DOMContentLoaded', (event) => {
         if (type == TxType.Ask) {
             amountOutput.value = (Number(amountInput.value) * (1 / Number(data.ask))).toString();
 
-            amountIn = new Decimal(amountInput.value).mul(new Decimal(10).pow(data.amount0Dec)).toFixed();
-            amountOut = new Decimal(amountOutput.value).mul(new Decimal(10).pow(data.amount1Dec)).toFixed();
+            amountIn = new Decimal(amountInput.value).mul(new Decimal(10).pow(data.amount1Dec)).toFixed(0);
+            amountOut = new Decimal(amountOutput.value).mul(new Decimal(10).pow(data.amount0Dec)).toFixed(0);
             takerAssetAddres = data.amount1Address;
             makerAssetAddres = data.amount0Address;
         } else {
             amountOutput.value = (Number(amountInput.value) * Number(data.bid)).toString();
 
-            amountIn = new Decimal(amountInput.value).mul(new Decimal(10).pow(data.amount0Dec))/*.sub("10000000000000")*/.toFixed();
-            amountOut = new Decimal(amountOutput.value).mul(new Decimal(10).pow(data.amount1Dec))/*.sub("10000000000000000000")*/.toFixed();
+            amountIn = new Decimal(amountInput.value).mul(new Decimal(10).pow(data.amount0Dec))/*.sub("10000000000000")*/.toFixed(0);
+            amountOut = new Decimal(amountOutput.value).mul(new Decimal(10).pow(data.amount1Dec))/*.sub("10000000000000000000")*/.toFixed(0);
             takerAssetAddres = data.amount0Address;
             makerAssetAddres = data.amount1Address;
         }
@@ -240,6 +228,8 @@ window.addEventListener('DOMContentLoaded', (event) => {
             feeAmount: "0",
             frontendAddress: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
         });
+
+        console.log("Maker address" + data.makerAddress);
 
         const resultEIP712 = limitOrderBuilder.buildRFQOrderTypedData(limitOrder);
 
@@ -267,7 +257,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
             return;
 
         pubnub_client.publish({
-            channel: "one-usdt-2",
+            channel: "eth-usdt-10",
             message: {
                 content: {
                     type: "action",
@@ -354,7 +344,7 @@ async function updateSessionData() {
 
     const session = JSON.parse(localStorage.getItem('session-taker'));
     const provider = new ethers.providers.Web3Provider(window.ethereum)
-    const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
+    const LOPContract = new ethers.Contract(Config.limitOrderProtocolAddress, Config.limitOrderProtocolABI, provider)
     const signer = provider.getSigner(0)
     const signerAddress = await signer.getAddress();
 
@@ -403,10 +393,10 @@ async function updateSessionData() {
 async function createSession() {
     try {
         const provider = new ethers.providers.Web3Provider(window.ethereum)
-        const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
+        const LOPContract = new ethers.Contract(Config.limitOrderProtocolAddress, Config.limitOrderProtocolABI, provider)
         const signer = provider.getSigner(0)
         const wallet = ethers.Wallet.createRandom()
-        const expirationTime = Math.round(Date.now() / 1000) + 1800;
+        const expirationTime = Math.round(Date.now() / 1000) + 7200;
         // Session expires in 2 minutes
 
         const result = await LOPContract.connect(signer).createOrUpdateSession(wallet.address, expirationTime);
@@ -427,7 +417,7 @@ async function createSession() {
 async function endSession() {
     try {
         const provider = new ethers.providers.Web3Provider(window.ethereum)
-        const LOPContract = new ethers.Contract(lopAddress, ABILOP, provider)
+        const LOPContract = new ethers.Contract(Config.limitOrderProtocolAddress, Config.limitOrderProtocolABI, provider)
         const signer = provider.getSigner(0)
 
         const result = await LOPContract.connect(signer).endSession();

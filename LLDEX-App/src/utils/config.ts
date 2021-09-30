@@ -3,6 +3,7 @@ import { TokenPair } from "../models/token_pair"
 
 export default class Config {
     static limitOrderProtocolABI: string[] = [
+        "function testSignature(tuple(uint256 info, uint256 feeAmount, address takerAsset, address makerAsset, address feeTokenAddress, address frontendAddress, bytes takerAssetData, bytes makerAssetData), bytes calldata signature) public view returns(bytes32 orderHash, address signer, uint256 chainId)",
         "function fillOrderRFQ(tuple(uint256 info, uint256 feeAmount, address takerAsset, address makerAsset, address feeTokenAddress, address frontendAddress, bytes takerAssetData, bytes makerAssetData), bytes calldata signature, uint256 takingAmount, uint256 makingAmount) external returns(uint256, uint256)",
         "function session(address owner) external view returns(address taker, address sessionKey, uint256 expirationTime, uint256 txCount)",
         "function createOrUpdateSession(address sessionKey, uint256 expirationTime) external returns(int256)",
@@ -14,13 +15,44 @@ export default class Config {
         "event SessionUpdated(address indexed sender, address indexed sessionKey, uint256 expirationTime)",
     ]
 
-    static pubNubPublishKey: string = "pub-dd76188a-d8cc-42cf-9625-335ef44bb3a1"
-    static pubNubSubscribeKey: string = "sub-4c298de8-a12e-11e1-bd35-5d12de0b12ad"
+    static pubNubPublishKey: string = "pub-c-d009446b-b9de-41fa-8c2d-b779fd13ba58"
+    static pubNubSubscribeKey: string = "sub-c-790990b4-0c8e-11ec-9c1c-9adb7f1f2877"
     static limitOrderProtocolAddress: string = "0xbFE71f56Fd7670BBB2C76A44067d633F1B44F765"
     static fillOrderRFQEstimatedGasUsage: number = 139333
     static signWithPrivateKey: boolean = true;
     
     static pairs: TokenPair[] = [
+        // Ropsten
+        // {
+        //     token0: "0x860aa68b0644b1533bb5e0a988cf57b0ebdeb780",
+        //     token1: "0x4d77f4791cf9e10a4d905346a189d0da58895125",
+        //     token0Dec: 18,
+        //     token1Dec: 18,
+        //     slippage: new Decimal("0.0005"),
+        //     spreadBid: new Decimal("0.5"),
+        //     spreadAsk: new Decimal("0.7"),
+        //     maxToken0: new Decimal("10.0"),
+        //     maxToken1: new Decimal("15000.0"),
+        //     mappingBinance: "bnbusdt",
+        //     channelName: "one-usdt-10"
+        // },
+
+        // Local hardhat
+        // {
+        //         token0: "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+        //         token1: "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
+        //         token0Dec: 18,
+        //         token1Dec: 18,
+        //         slippage: new Decimal("0.0005"),
+        //         spreadBid: new Decimal("0.5"),
+        //         spreadAsk: new Decimal("0.7"),
+        //         maxToken0: new Decimal("10.0"),
+        //         maxToken1: new Decimal("15000.0"),
+        //         mappingBinance: "bnbusdt",
+        //         channelName: "one-usdt-10"
+        //     },
+
+    // Harmony mainnet
     {
         token0: "0xcf664087a5bb0237a0bad6742852ec6c8d69a27a",
         token1: "0x3c2b8be99c50593081eaa2a724f0b8285f5aba8f",
@@ -29,10 +61,10 @@ export default class Config {
         slippage: new Decimal("0.0005"),
         spreadBid: new Decimal("0.005"),
         spreadAsk: new Decimal("0.004"),
-        maxToken0: new Decimal("10.0"),
-        maxToken1: new Decimal("15000.0"),
+        maxToken0: new Decimal("5.0"),
+        maxToken1: new Decimal("0.5"),
         mappingBinance: "oneusdt",
-        channelName: "one-usdt-2"
+        channelName: "one-usdt-10"
     },
     {
         token0: "0xcf664087a5bb0237a0bad6742852ec6c8d69a27a",
@@ -45,7 +77,7 @@ export default class Config {
         maxToken0: new Decimal("135.0"),
         maxToken1: new Decimal("5.0"),
         mappingBinance: "onebtc",
-        channelName: "one-btc-2"
+        channelName: "one-btc-10"
     },
     {
         token0: "0x6983d1e6def3690c4d616b13597a09e6193ea013",
@@ -58,7 +90,7 @@ export default class Config {
         maxToken0: new Decimal("135.0"),
         maxToken1: new Decimal("5.0"),
         mappingBinance: "ethbtc",
-        channelName: "eth-btc-2"
+        channelName: "eth-btc-10"
     },
     {
         token0: "0x6983d1e6def3690c4d616b13597a09e6193ea013",
@@ -71,7 +103,7 @@ export default class Config {
         maxToken0: new Decimal("135.0"),
         maxToken1: new Decimal("5.0"),
         mappingBinance: "ethusdt",
-        channelName: "eth-usdt-2"
+        channelName: "eth-usdt-10"
     },
     {
         token0: "0x3095c7557bcb296ccc6e363de01b760ba031f2d9",
@@ -84,7 +116,7 @@ export default class Config {
         maxToken0: new Decimal("135.0"),
         maxToken1: new Decimal("5.0"),
         mappingBinance: "btcusdt",
-        channelName: "btc-usdt-2"
+        channelName: "btc-usdt-10"
     }
 ]
 }

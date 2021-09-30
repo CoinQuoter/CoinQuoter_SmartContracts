@@ -18,6 +18,8 @@ import { LimitOrder } from './models/limit_order';
 import { SignedLimitOrder } from './models/signed_limit_order';
 import { DealBlotterRow } from './models/deal_blotter_row';
 import BinanceConfig from './utils/binance_config';
+import { hasUncaughtExceptionCaptureCallback } from 'process';
+import { PostedTransaction } from './models/posted_transaction';
 
 var createHmac = require('create-hmac')
 
@@ -32,7 +34,7 @@ interface ConnectInfo {
 }
 
 var streamLatestSnapshot: Map<string, BinanceStreamSnapshot> = new Map<string, BinanceStreamSnapshot>();
-var postedTransactions: Map<string, TokenPair> = new Map<string, TokenPair>();
+var postedTransactions: Map<string, PostedTransaction> = new Map<string, PostedTransaction>();
 
 const uuid = PubNub.generateUUID()
 const pubnubClient = new PubNub({
@@ -46,7 +48,15 @@ pubnubClient.addListener({
         const evtData = event.message.content
 
         if (evtData.type == 'action' && evtData.method == 'execute_order') {
-            _confirmOrder(evtData.data, event.message.sender, event.channel)
+            const messageFrom = event.publisher;
+            console.log(messageFrom);
+
+            _confirmOrder(
+                evtData.data, 
+                event.message.sender, 
+                event.channel,
+                messageFrom
+            )
         }
     },
     presence: function (event) {
@@ -56,7 +66,12 @@ pubnubClient.addListener({
     }
 })
 
-async function _confirmOrder(data: SignedLimitOrder, sender: string, channel: string) {
+async function _confirmOrder(
+    data: SignedLimitOrder, 
+    sender: string, 
+    channel: string, 
+    publisher: string
+) {
     const limitOrder: RFQOrder = data.limitOrder;
     const pair: TokenPair = Config.pairs.find(x => {
         return ((x.token0 === limitOrder.makerAsset.toString() && x.token1 === limitOrder.takerAsset.toString()) || 
@@ -123,7 +138,7 @@ async function _confirmOrder(data: SignedLimitOrder, sender: string, channel: st
         takerAmount = new Decimal(data.takerAmount)
             .add(makerFeeAmount
                 .mul(new Decimal(10)
-                .pow(pair.token1Dec)))
+                .pow(pair.token0Dec)))
                 .toFixed()
     }
 
@@ -154,13 +169,18 @@ async function _confirmOrder(data: SignedLimitOrder, sender: string, channel: st
             return;
         }
 
-        
+        console.log(JSON.stringify(data.limitOrder, null, 2));
+        console.log("Taker amount" + takerAmount);
+        console.log("Maker amount" + makerAmount);
+        console.log("Signature" + data.limitOrderSignature);
+        console.log("Signer" + await signer.getAddress());
+
         const result = await contract.connect(signer).fillOrderRFQ(
             data.limitOrder,
             data.limitOrderSignature,
-            takerAmount,
-            makerAmount,
-            { gasLimit: 1000000 }
+            0,
+            0,
+            {gasLimit: 1000000}
         )
 
         _appendRowToBlotter(pair, blotterRow, result.hash);
@@ -168,8 +188,23 @@ async function _confirmOrder(data: SignedLimitOrder, sender: string, channel: st
             hash: result.hash
         })
 
-        postedTransactions.set(result.hash, pair);
-        await provider.waitForTransaction(result.hash)
+        postedTransactions.set(result.hash, {
+            order: limitOrder,
+            pair: pair
+        });
+        const receipt = await provider.waitForTransaction(result.hash)
+
+        console.log(receipt);
+        if (receipt.status == 0) {
+            txFail(
+                pair.channelName, 
+                result.hash, 
+                'Unknown error'
+            )
+
+            return;
+        }
+
         txSuccess(pair.channelName, result.hash)
     } catch (err) {
         if (err?.transaction?.hash) {
@@ -179,6 +214,14 @@ async function _confirmOrder(data: SignedLimitOrder, sender: string, channel: st
                 pair.channelName, 
                 err.transaction.hash, 
                 err.data?.message ?? ''
+            )
+        } else {
+            const errorMessage = err.data?.message ?? 'Unknown error'
+            
+            txFail(
+                pair.channelName, 
+                '-', 
+                errorMessage
             )
         }
     }
@@ -336,17 +379,23 @@ function _validateOrder(pair: TokenPair, order: RFQOrder, blotterRow: DealBlotte
     }
 
     const orderType: OrderType = order.takerAsset == pair.token0 ? OrderType.bid : OrderType.ask
-    const price = orderType == OrderType.bid ? 
-        new Decimal(makerAssetData.amount).div(new Decimal(takerAssetData.amount)) : 
-        new Decimal(takerAssetData.amount).div(new Decimal(makerAssetData.amount))
     
-    const amountToken0 = (orderType == OrderType.bid ? new Decimal(takerAssetData.amount) : new Decimal(makerAssetData.amount))
+    const amountToken0 = new Decimal(takerAssetData.amount)
         .div(new Decimal(10)
-        .pow(pair.token0Dec))
+        .pow(orderType == OrderType.bid ? pair.token0Dec: pair.token1Dec))
 
-    const amountToken1 = (orderType == OrderType.bid ? new Decimal(makerAssetData.amount) : new Decimal(takerAssetData.amount))
+    const amountToken1 = new Decimal(makerAssetData.amount)
         .div(new Decimal(10)
-        .pow(pair.token1Dec))
+        .pow(orderType == OrderType.bid ? pair.token1Dec: pair.token0Dec))
+
+    console.log("takerAssetData.amount: " + takerAssetData.amount);
+    console.log("makerAssetData.amount: " + makerAssetData.amount);
+    console.log("Pair token 1 dec: " + pair.token1Dec);
+    console.log("Pair token 0 dec: " + pair.token0Dec);
+
+    const price = orderType == OrderType.bid ? 
+        amountToken1.div(amountToken0) : 
+        amountToken0.div(amountToken1)
 
     const blotterAmountToken0 = orderType == OrderType.bid ? amountToken0 : amountToken1;
     const blotterAmountToken1 = orderType == OrderType.bid ? amountToken1 : amountToken0;
@@ -427,7 +476,9 @@ async function txSuccess(channel: string, hash: String) {
     })
 
     Config.pairs.forEach(async function(pair) {
-        if (!await _validateBalance(pair)) {
+        const streamingPrices: boolean = $(`#start-${pair.mappingBinance}`).is(':checked')
+
+        if (streamingPrices && !await _validateBalance(pair)) {
             _stopStreamingPrices(pair);
 
             return;
@@ -467,8 +518,16 @@ $(document).ready(async function () {
 
     await updateAccountData()
 
-    $('#generate-keyset').on('click', function () {
-        generateKeyset()
+    $('#generate-keyset').on('click', async function () {
+        await generateKeyset()
+
+        if (localStorage.getItem('session-maker') == null)
+            return
+
+        const session = JSON.parse(localStorage.getItem('session-maker'))
+        $('#sender-session-private-key-input').val(session.session_private_key)
+
+        updatePublicKey()
     })
 
     $('#sender-session-balance-refresh').on('click', function () {
@@ -489,7 +548,7 @@ $(document).ready(async function () {
 
     $('#sender-session-private-key-input').on('input', async function () {
         try {
-            generateKeyset($('#sender-session-private-key-input').val().toString())
+            await generateKeyset($('#sender-session-private-key-input').val().toString())
             updatePublicKey()
         } catch (err) {
         }
@@ -528,11 +587,26 @@ function _initalizeLOPEvents() {
         if (!postedTransactions.has(hash))
             return;
 
-        const takingAmountDec = new Decimal(takingAmount.toString()).div(new Decimal(10).pow(postedTransactions.get(hash).token0Dec))
-        const makingAmountDec = new Decimal(makingAmount.toString()).div(new Decimal(10).pow(postedTransactions.get(hash).token1Dec))
+        const transaction: PostedTransaction = postedTransactions.get(hash);
 
-        $(`#${hash}-amount-in`).text($(`#${hash}-amount-in`).text() + '\n(' + takingAmountDec.toFixed(5) + ')');
-        $(`#${hash}-amount-out`).text($(`#${hash}-amount-out`).text() + '\n(' + makingAmountDec.toFixed(5) + ')');
+        const takerAssetData = OrderDecoder.decodeAssetData(transaction.order.takerAssetData)
+        const makerAssetData = OrderDecoder.decodeAssetData(transaction.order.makerAssetData)
+
+        const orderType: OrderType = transaction.order.takerAsset == transaction.pair.token0 ? 
+            OrderType.bid : 
+            OrderType.ask
+
+
+        const amountToken0 = new Decimal(takerAssetData.amount)
+            .div(new Decimal(10)
+            .pow(orderType == OrderType.bid ? transaction.pair.token0Dec: transaction.pair.token1Dec))
+
+        const amountToken1 = new Decimal(makerAssetData.amount)
+            .div(new Decimal(10)
+            .pow(orderType == OrderType.bid ? transaction.pair.token1Dec: transaction.pair.token0Dec))
+
+        $(`#${hash}-amount-in`).text($(`#${hash}-amount-in`).text() + '\n(' + (orderType == OrderType.bid ? amountToken0.toFixed(5) : amountToken1.toFixed(5)) + ')');
+        $(`#${hash}-amount-out`).text($(`#${hash}-amount-out`).text() + '\n(' + (orderType == OrderType.bid ? amountToken1.toFixed(5) : amountToken0.toFixed(5)) + ')');
     });
 }
 
@@ -714,7 +788,7 @@ async function _appendPair(pair: TokenPair) {
 }
 
 function _initBinanceStream(pair: TokenPair) {
-    const streamBNB = new WebSocket(`${BinanceConfig.testnetWebSocket}/${pair.mappingBinance}@depth5@100ms`)
+    const streamBNB = new WebSocket(`${BinanceConfig.testnetWebSocket}/${pair.mappingBinance}@depth5@1000ms`)
     streamBNB.onopen = function (_) {
         console.log(`Connected to binance ${pair.mappingBinance} pricing stream`)
     }
@@ -894,32 +968,36 @@ function copyToClipboard(text: string) {
 }
 
 async function _updateBalanceData(pair: TokenPair) {
-    const provider = new ethers.providers.Web3Provider(window.ethereum)
-    const tokenContract0 = new ethers.Contract(pair.token0, ERC20ABI, provider)
-    const tokenContract1 = new ethers.Contract(pair.token1, ERC20ABI, provider)
+    try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum)
+        const tokenContract0 = new ethers.Contract(pair.token0, ERC20ABI, provider)
+        const tokenContract1 = new ethers.Contract(pair.token1, ERC20ABI, provider)
 
-    const makerAddress = await provider.getSigner(0).getAddress()
-    const balanceToken0 = new Decimal((await tokenContract0
-        .connect(makerAddress)
-        .balanceOf(makerAddress))
-        .toString())
-        .div(new Decimal(10).pow(pair.token0Dec))
+        const makerAddress = await provider.getSigner(0).getAddress()
+        const balanceToken0 = new Decimal((await tokenContract0
+            .connect(makerAddress)
+            .balanceOf(makerAddress))
+            .toString())
+            .div(new Decimal(10).pow(pair.token0Dec))
+            
+        const balanceToken1 = new Decimal((await tokenContract1
+            .connect(makerAddress)
+            .balanceOf(makerAddress))
+            .toString())
+            .div(new Decimal(10).pow(pair.token1Dec))
         
-    const balanceToken1 = new Decimal((await tokenContract1
-        .connect(makerAddress)
-        .balanceOf(makerAddress))
-        .toString())
-        .div(new Decimal(10).pow(pair.token1Dec))
-    
-    const gasPrice: BigNumber = await provider.getGasPrice();
-    const transactionGasFee: Decimal = new Decimal(gasPrice.toString())
-        .mul(Config.fillOrderRFQEstimatedGasUsage)
-        .div(new Decimal(10)
-            .pow(pair.token0Dec));
+        const gasPrice: BigNumber = await provider.getGasPrice();
+        const transactionGasFee: Decimal = new Decimal(gasPrice.toString())
+            .mul(Config.fillOrderRFQEstimatedGasUsage)
+            .div(new Decimal(10)
+                .pow(pair.token0Dec));
 
-    $(`#${pair.mappingBinance}-balance-token0`).text(balanceToken0.toFixed(8))
-    $(`#${pair.mappingBinance}-balance-token1`).text(balanceToken1.toFixed(8))
-    $(`#${pair.mappingBinance}-gas-fee`).text(transactionGasFee.toFixed(8));
+        $(`#${pair.mappingBinance}-balance-token0`).text(balanceToken0.toFixed(8))
+        $(`#${pair.mappingBinance}-balance-token1`).text(balanceToken1.toFixed(8))
+        $(`#${pair.mappingBinance}-gas-fee`).text(transactionGasFee.toFixed(8))
+    } catch (err) {
+        console.error('Failed to update balances: ' + err)
+    }
 }
 
 async function _updateAllowanceData(pair: TokenPair) {
@@ -968,10 +1046,9 @@ async function generateKeyset(privateKey?: string) {
 
     localStorage.setItem('session-maker', JSON.stringify({
         session_private_key: privateKey ? privateKey : wallet.privateKey,
-        session_creator: await signer.getAddress()
     }))
 
-    $('#sender-session-private-key-input').val(wallet.privateKey)
+    //$('#sender-session-private-key-input').val(wallet.privateKey)
 
     updatePublicKey()
 }
@@ -1008,7 +1085,6 @@ async function _validateBalance(pair: TokenPair): Promise<boolean> {
 
 async function updatePublicKey() {
     const publicKey = await privateKeyToPublic($('#sender-session-private-key-input').val().toString())
-    console.log(publicKey)
 
     $('#current-session-key').text(publicKey)
 }
@@ -1053,55 +1129,70 @@ async function createSession() {
 
 
 async function updateAccountData() {
-    const provider = new ethers.providers.Web3Provider(window.ethereum)
-
-    if (localStorage.getItem('session-maker') != null) {
-        const session = JSON.parse(localStorage.getItem('session-maker'))
-
-        $('#current-session-key').val(await privateKeyToPublic(session.session_private_key))
-        $('#sender-session-private-key-input').val(session.session_private_key)
-    }
-
-    window.ethereum.on('accountsChanged', async (accounts: any) => {
-        const signer = provider.getSigner(0)
-        $('#public-key').text(await signer.getAddress())
-        updateSessionData()
-    })
-
-    window.ethereum.on('connect', async (connectInfo: ConnectInfo) => {
-        const signer = provider.getSigner(0)
-        $('#public-key').text(await signer.getAddress())
-        updateSessionData()
-    })
-
-    updatePublicKey()
-    updateETHBalance()
-    //updateAllowance()
-
     try {
-        const signer = provider.getSigner(0)
+        const provider = new ethers.providers.Web3Provider(window.ethereum)
 
-        $('#public-key').text(await signer.getAddress())
-        updateSessionData()
-    } catch (err) {
-        $('#public-key').text('Not connected to provider')
-        console.error(err)
+        if (localStorage.getItem('session-maker') != null) {
+            const session = JSON.parse(localStorage.getItem('session-maker'))
+
+            if (!session?.session_private_key) {
+                localStorage.removeItem('session-maker');
+            }
+
+            $('#current-session-key').val(await privateKeyToPublic(session.session_private_key))
+            $('#sender-session-private-key-input').val(session.session_private_key)
+        }
+
+        window.ethereum.on('accountsChanged', async (accounts: any) => {
+            const signer = provider.getSigner(0)
+            $('#public-key').text(await signer.getAddress())
+            updateSessionData()
+        })
+
+        window.ethereum.on('connect', async (connectInfo: ConnectInfo) => {
+            const signer = provider.getSigner(0)
+            $('#public-key').text(await signer.getAddress())
+            updateSessionData()
+        })
+
+        updatePublicKey()
+        updateETHBalance()
+        //updateAllowance()
+
+        try {
+            const signer = provider.getSigner(0)
+
+            $('#public-key').text(await signer.getAddress())
+            updateSessionData()
+        } catch (err) {
+            $('#public-key').text('Not connected to provider')
+            console.error(err)
+        }
+    } catch(err) {
+        console.error(err);
     }
 }
 
 async function updateETHBalance() {
-    if (localStorage.getItem('session-maker') != 'null') {
-        const session = JSON.parse(localStorage.getItem('session-maker'))
-        const provider = new ethers.providers.Web3Provider(window.ethereum)
-        const sessionBalance = await provider.getBalance(await privateKeyToPublic(session.session_private_key))
-        $('#sender-session-balance').text(ethers.utils.formatEther(sessionBalance) + ' ETH')
-    } else {
-        $('#sender-session-balance').text('No private key')
-    }
+    try {
+        if (localStorage.getItem('session-maker') != 'null') {
+            const session = JSON.parse(localStorage.getItem('session-maker'))
+            const provider = new ethers.providers.Web3Provider(window.ethereum)
 
-    Config.pairs.forEach(x => {
-        _updateBalanceData(x)
-    });
+            if (session?.session_private_key) {
+                const sessionBalance = await provider.getBalance(await privateKeyToPublic(session.session_private_key))
+                $('#sender-session-balance').text(ethers.utils.formatEther(sessionBalance) + ' ETH')
+            }
+        } else {
+            $('#sender-session-balance').text('No private key')
+        }
+
+        Config.pairs.forEach(x => {
+            _updateBalanceData(x)
+        });
+    } catch (err) {
+        console.error('Failed to get balance: ' + err);
+    }
 }
 
 async function endSession() {
@@ -1146,6 +1237,7 @@ async function updateSessionData() {
     const signerAddress = await signer.getAddress()
 
     const expirationTime = await LOPContract.connect(signer).sessionExpirationTime(signerAddress)
+    const sessionKeyBlockchain = await LOPContract.connect(signer).session(signerAddress)
     const expirationDate = new Date(Number(expirationTime.toString()) * 1000)
     const dateNow = new Date().getTime() / 1000
 
@@ -1154,7 +1246,7 @@ async function updateSessionData() {
     if (expirationTime > dateNow) {
         $('#end-session').show()
         $('#private-key').val(session.session_private_key)
-        $('#session-active-key').text(await privateKeyToPublic(session.session_private_key))
+        $('#session-active-key').text(sessionKeyBlockchain.sessionKey.toString())
         $('#session-exp').text(expirationDate.toString())
 
         timeLeftInterval = setInterval(async function () {

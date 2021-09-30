@@ -19,8 +19,6 @@ import "./libraries/UncheckedAddress.sol";
 import "./libraries/ArgumentsDecoder.sol";
 import "./libraries/SilentECDSA.sol";
 
-import "hardhat/console.sol";
-
 /// @title 1inch Limit Order Protocol v1
 contract LimitOrderProtocol is
     ImmutableOwner(address(this)),
@@ -70,11 +68,6 @@ contract LimitOrderProtocol is
         bytes makerAssetData; // (transferFrom.selector, sender, signer, makerAmount, ...)
     }
 
-    bytes32 public constant LIMIT_ORDER_TYPEHASH =
-        keccak256(
-            "Order(uint256 salt,address takerAsset,address makerAsset,bytes takerAssetData,bytes makerAssetData,bytes getTakerAmount,bytes getMakerAmount,bytes predicate,bytes permit,bytes interaction)"
-        );
-
     bytes32 public constant LIMIT_ORDER_RFQ_TYPEHASH =
         keccak256(
             "OrderRFQ(uint256 info,uint256 feeAmount,address takerAsset,address makerAsset,address feeTokenAddress,address frontendAddress,bytes takerAssetData,bytes makerAssetData)"
@@ -110,34 +103,31 @@ contract LimitOrderProtocol is
         return _invalidator[taker][slot];
     }
 
-    /**
-     * @notice Calls every target with corresponding data. Then reverts with CALL_RESULTS_0101011 where zeroes and ones
-     * denote failure or success of the corresponding call
-     * @param targets Array of addresses that will be called
-     * @param data Array of data that will be passed to each call
-     */
-    function simulateCalls(address[] calldata targets, bytes[] calldata data)
-        external
-    {
-        require(targets.length == data.length, "LOP: array size mismatch");
-        bytes memory reason = new bytes(targets.length);
-        for (uint256 i = 0; i < targets.length; i++) {
-            // solhint-disable-next-line avoid-low-level-calls
-            (bool success, bytes memory result) = targets[i].call(data[i]);
-            if (success && result.length > 0) {
-                success = abi.decode(result, (bool));
-            }
-            reason[i] = success ? bytes1("1") : bytes1("0");
-        }
-
-        // Always revert and provide per call results
-        revert(string(abi.encodePacked("CALL_RESULTS_", reason)));
-    }
-
     /// @notice Cancels order's quote
     function cancelOrderRFQ(uint256 orderInfo) external {
         _invalidator[msg.sender][uint64(orderInfo) >> 8] |= (1 <<
             (orderInfo & 0xff));
+    }
+
+    function testSignature(OrderRFQ memory order, bytes calldata signature)
+        public
+        view
+        returns (
+            bytes32 orderHash,
+            address signer,
+            uint256 chainId
+        )
+    {
+        // Validate order
+        orderHash = _hash(order);
+        signer = SilentECDSA.recover(orderHash, signature);
+        chainId = block.chainid;
+        // _validate(
+        //     order.takerAssetData,
+        //     order.makerAssetData,
+        //     signature,
+        //     orderHash
+        // );
     }
 
     /// @notice Fills order's quote, fully or partially (whichever is possible)
@@ -248,41 +238,6 @@ contract LimitOrderProtocol is
             takingAmount <= orderTakerAmount,
             "LOP: taking amount exceeded"
         );
-
-        // require(
-        //     makingAmount <= orderMakerAmount,
-        //     "LOP: making amount exceeded"
-        // );
-
-        // if (makingAmount == 0 && takingAmount == 0) {
-        //     // Two zeros means whole order
-        //     takingAmount = orderTakerAmount;
-        //     makingAmount = orderMakerAmount;
-        // } else if (makingAmount == 0) {
-        //     makingAmount =
-        //         (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
-        //         orderTakerAmount;
-        // } else if (takingAmount == 0) {
-        //     // If making amount is specified, taking amount should stay the same as in signed RFQ order
-        //     takingAmount = orderTakerAmount;
-        // } else {
-        //     revert("LOP: one of amounts should be 0");
-        // }
-
-        // require(
-        //     takingAmount > 0 && makingAmount > 0,
-        //     "LOP: can't swap 0 amount"
-        // );
-        // require(
-        //     takingAmount <= orderTakerAmount,
-        //     "LOP: taking amount exceeded"
-        // );
-
-        // Let maker make transaction for bigger quote than order makingAmount
-        // require(
-        //     makingAmount >= orderMakerAmount,
-        //     "LOP: making amount exceeded"
-        // );
 
         // Validate order
         bytes32 orderHash = _hash(order);
@@ -473,7 +428,7 @@ contract LimitOrderProtocol is
                     orderHash,
                     signature
                 ),
-                "LOP: bad signature"
+                "LOP: SNE bad signature "
             );
         } else {
             // Sesssion is expired
@@ -484,32 +439,9 @@ contract LimitOrderProtocol is
                     orderHash,
                     signature
                 ),
-                "LOP: bad signature"
+                "LOP: SE bad signature"
             );
         }
-
-        // address taker = _sessions[
-        //     address(takerAssetData.decodeAddress(_FROM_INDEX))
-        // ].sessionKey;
-        // if (
-        //     (signature.length != 65 && signature.length != 64) ||
-        //     SilentECDSA.recover(orderHash, signature) != taker
-        // ) {
-        //     bytes memory result = taker.uncheckedFunctionStaticCall(
-        //         abi.encodeWithSelector(
-        //             IERC1271.isValidSignature.selector,
-        //             orderHash,
-        //             signature
-        //         ),
-        //         "LOP: isValidSignature failed"
-        //     );
-        //     require(
-        //         result.length == 32 &&
-        //             abi.decode(result, (bytes4)) ==
-        //             IERC1271.isValidSignature.selector,
-        //         "LOP: bad signature"
-        //     );
-        // }
     }
 
     function _callTakerAssetTransferFrom(

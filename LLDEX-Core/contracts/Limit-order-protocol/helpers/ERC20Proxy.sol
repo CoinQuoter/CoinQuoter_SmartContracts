@@ -21,12 +21,12 @@ abstract contract ERC20Proxy is ImmutableOwner {
 
     // keccak256("func_50BkM4K(address,address,uint256,address)") = 0x23b872de
     function func_50BkM4K(
-        address from,
-        address to,
-        uint256 amount,
+        address sender,
+        address recipient,
+        uint256 value,
         IERC20 token
     ) external onlyImmutableOwner {
-        token.safeTransferFrom(from, to, amount);
+        token.safeTransferFrom(sender, recipient, value);
     }
 }
 
