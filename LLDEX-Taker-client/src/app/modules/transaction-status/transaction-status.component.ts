@@ -31,6 +31,7 @@ export class TransactionStatusComponent implements OnInit {
   buyBalance: number;
   price: number;
   gasPrice: number;
+  hash: string;
 
   constructor(private tradeDataService: TradeDataService,
               private executionDataService: ExecutionDataService,
@@ -39,6 +40,7 @@ export class TransactionStatusComponent implements OnInit {
 
   ngOnInit(): void {
     this.status = "pending";
+    this.hash = '';
     this.tradeDate = new Date();
     const executionData = this.executionDataService.getData();
     const tradeData = this.tradeDataService.getData();
@@ -48,9 +50,12 @@ export class TransactionStatusComponent implements OnInit {
     this.pubnubService.connect(this.config).addListener({message: async event => {
           const message = event.message.content;
           this.data = event.message.content.data;
-          console.log(this.data);
+
           if(message.type == "transaction_posted") this.status = "posted";
-          else if(message.type == "transaction_filled") this.status = "confirmed";
+          else if(message.type == "transaction_filled") {
+            this.status = "confirmed";
+            this.hash = this.data.hash;
+          }
           else if(message.type == "transaction_failed") this.status = "failed";
           else if(message.type == "transaction_rejected") this.status = "rejected";
       }});
@@ -61,7 +66,7 @@ export class TransactionStatusComponent implements OnInit {
     this.sellToken = executionData.sellToken;
     this.buyToken = executionData.buyToken;
     this.sellBalance = executionData.sellBalance;
-    this.buyBalance = Math.floor(executionData.buyBalance);
+    this.buyBalance = executionData.buyBalance;
     this.price = executionData.price;
     this.type = executionData.type;
     this.gasPrice = executionData.gasPrice;

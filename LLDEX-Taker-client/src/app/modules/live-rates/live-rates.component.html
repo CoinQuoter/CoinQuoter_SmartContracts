@@ -1,11 +1,18 @@
 <div class="w-3/5 mx-auto mt-16">
   <div class="flex flex-wrap">
-    <app-exchange-rate
+    <app-exchange-rate [connection]="one_usdt" class="w-2/4"></app-exchange-rate>
+    <app-exchange-rate [connection]="one_btc" class="w-2/4"></app-exchange-rate>
+    <app-exchange-rate [connection]="eth_btc" class="w-2/4"></app-exchange-rate>
+    <app-exchange-rate [connection]="eth_usdt" class="w-2/4"></app-exchange-rate>
+    <app-exchange-rate [connection]="btc_usdt" class="w-2/4"></app-exchange-rate>
+
+
+    <!-- <app-exchange-rate
       [connection]="weth_dai"
       class="w-2/4"></app-exchange-rate>
     <app-exchange-rate
       [connection]="weth_lldex"
-      class="w-2/4"></app-exchange-rate>
+      class="w-2/4"></app-exchange-rate> -->
 <!--    <app-exchange-rate-->
 <!--      [connection]="weth_dai"-->
 <!--      class="w-2/4"></app-exchange-rate>-->

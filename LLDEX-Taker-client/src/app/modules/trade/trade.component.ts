@@ -9,6 +9,7 @@ import { BlockchainService } from '../../shared/services/blockchain/blockchain.s
 import { ProviderService, WEB3PROVIDER } from '../../shared/services/provider/provider.service';
 import { TradeData, TradeDataService } from '../../shared/services/trade-data/trade-data.service';
 import { ExecutionDataService } from '../../shared/services/execution-data/execution-data.service';
+import Decimal from 'decimal.js';
 
 @Component({
   selector: 'app-trade',
@@ -68,7 +69,10 @@ export class TradeComponent implements OnInit, OnDestroy {
         this.ask = this.data.ask;
         this.buyAmount = this.isOperationAsk() ? this.sellAmount/this.ask : this.sellAmount * this.bid;
 
+        this.helperService.setAccuracy(this.data.amount0Dec)
         let baseBalance = this.helperService.toNumber(await this.blockchainService.getTokenBalance(baseTokenContract));
+
+        this.helperService.setAccuracy(this.data.amount1Dec)
         let quoteBalance = this.helperService.toNumber(await this.blockchainService.getTokenBalance(quoteTokenContract));
 
         baseBalance -= this.isOperationAsk() ? -this.buyAmount : this.sellAmount;

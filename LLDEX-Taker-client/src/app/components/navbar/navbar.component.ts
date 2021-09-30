@@ -42,9 +42,14 @@ export class NavbarComponent implements OnInit {
             if (expirationTime > dateNow) {
               this.session = true;
               this.sessionService.setIsSession(true);
-              const session = this.sessionService.getSessionDetails();
-              this.address = session.session_creator;
-              this.sessionPublicKey = session.session_public_key;
+              this.address = address;
+
+              LOPContract.connect(signer).session(address).then((
+                data: any
+              ) => {
+                this.sessionPublicKey = data.sessionKey;
+              })
+
               let timerInteval = setInterval(() => {
                 let now = new Date().getTime();
                 this.timeLeft = this.expirationTimeStamp.getTime() - now;

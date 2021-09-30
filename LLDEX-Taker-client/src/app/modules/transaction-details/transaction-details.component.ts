@@ -101,7 +101,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
           this.data = event.message.content.data;
           this.blockButton = false;
 
-          this.helperService.setAccuracy(this.data.amount0Dec);
+          this.helperService.setAccuracy(this.isOperationAsk() ? this.data.amount1Dec : this.data.amount0Dec);
 
           this.gasPrice = (this.helperService.toNumber(await this.providerService.getGasPrice())
             *FILLORDER_RFQ_ESTIMATED_GAS_USAGE);
@@ -115,7 +115,6 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
             this.maxLiquidity = this.isOperationAsk() ? this.data.maxToken0 : this.data.maxToken1;
 
             this.maxLiquidity = this.isOperationAsk() ? (this.maxLiquidity * this.data.bid)*0.99 : (this.maxLiquidity/this.data.ask)*0.99;
-            console.log(this.maxLiquidity);
 
             this.approveAmount = this.helperService.toNumber(
               await this.blockchainService.getAllowanceAmount(currentContact, this.data.contractAddress)

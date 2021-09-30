@@ -47,7 +47,6 @@ export class AllowanceDialogComponent implements OnInit {
         this.ref.close();
       })
       .catch((e) => {
-        console.log(e);
         this.messageService.add({
           severity: 'error',
           summary: 'Error',

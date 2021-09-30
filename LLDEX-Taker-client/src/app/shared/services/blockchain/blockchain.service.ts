@@ -8,6 +8,7 @@ import { LimitOrderBuilder, PrivateKeyProviderConnector } from '../../../../../.
 import { ConnectionInfo } from '../../models/connection-info';
 import { PubnubService } from '../pubnub/pubnub.service';
 import { FEE_TOKEN_ADDRESS, FRONTEND_ADDRESS, LIMITORDERPROTOCOL_ADDRESS } from '../../constants/config.constants';
+import Decimal from 'decimal.js';
 
 const ABIERC20: string[] = [
   "function allowance(address _owner, address _spender) public view returns (uint256 remaining)",
@@ -73,6 +74,16 @@ export class BlockchainService {
     return this.providerService.getBalance(this.getSignerAddress());
   }
 
+  async getChainId(): Promise<number> {
+    const chainId = (await this.providerService.getNetwork()).chainId
+
+    switch (chainId) {
+      case 1666600000: return 1;
+      case 1666700000: return 2;
+      default: return chainId;
+    }
+  }
+
   async sign1InchOrder(type: EOperationType, data: any, amountInput: number, amountOutput: number) {
     const session = this.sessionService.getSessionDetails();
     const sessionPrivateKey = session.session_private_key.replace("0x", "");
@@ -82,11 +93,13 @@ export class BlockchainService {
     const providerConnector = new PrivateKeyProviderConnector(sessionPrivateKey, web3);
     let limitOrderBuilder = new LimitOrderBuilder(
       LIMITORDERPROTOCOL_ADDRESS,
-      (await this.providerService.getNetwork()).chainId,
+      await this.getChainId(),
       providerConnector);
 
-    let amountIn = (amountInput * Math.pow(10, data.amount0Dec)).toLocaleString('fullwide', {useGrouping:false});
-    let amountOut = (amountOutput * Math.pow(10, data.amount1Dec)).toLocaleString('fullwide', {useGrouping:false});
+      
+    let amountIn = new Decimal(amountInput).mul(new Decimal(10).pow(type == EOperationType.BID ? data.amount0Dec : data.amount1Dec)).toFixed(0);
+    let amountOut = new Decimal(amountOutput).mul(new Decimal(10).pow(type == EOperationType.BID ? data.amount1Dec : data.amount0Dec)).toFixed(0);
+
     const [takerAssetAddress, makerAssetAddress] =
       (type == EOperationType.ASK)
         ? [data.amount1Address, data.amount0Address]

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ECurrencyPair } from '../../enums/currency-pair.constants';
-import { WETH_DAI, WETH_LLDEX } from '../../constants/connections.constants';
+import { BTC_USDT, ETH_BTC, ETH_USDT, ONE_BTC, ONE_USDT} from '../../constants/connections.constants';
 import { ConnectionInfo } from '../../models/connection-info';
 import { BigNumber } from 'ethers';
 
@@ -15,8 +15,13 @@ export class HelperService {
 
   getConnectionInfo(selectedPair: string): ConnectionInfo {
     switch (selectedPair){
-      case ECurrencyPair.WETH_DAI: return WETH_DAI;
-      case ECurrencyPair.WETH_LLDEX: return WETH_LLDEX;
+      //case ECurrencyPair.WETH_DAI: return WETH_DAI;
+      // case ECurrencyPair.WETH_LLDEX: return WETH_LLDEX;
+      case ECurrencyPair.ONE_USDT: return ONE_USDT
+      case ECurrencyPair.ONE_BTC: return ONE_BTC
+      case ECurrencyPair.ETH_BTC: return ETH_BTC
+      case ECurrencyPair.BTC_USDT: return BTC_USDT
+      case ECurrencyPair.ETH_USDT: return ETH_USDT
     }
   }
 
