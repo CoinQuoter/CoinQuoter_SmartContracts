@@ -24,7 +24,7 @@ import "hardhat/console.sol";
 // @title LLDEX Protocol v1
 contract LLDEXProtocol is
     ImmutableOwner(address(this)),
-    EIP712("1inch Limit Order Protocol", "1"),
+    EIP712("LLDEX Protocol", "2"),
     AmountCalculator,
     ChainlinkCalculator,
     ERC1155Proxy,
@@ -66,14 +66,9 @@ contract LLDEXProtocol is
         address makerAsset;
         address feeTokenAddress;
         address frontendAddress;
-        bytes takerAssetData; // (transferFrom.selector, signer, ______, takerAmount, ...)
-        bytes makerAssetData; // (transferFrom.selector, sender, signer, makerAmount, ...)
+        bytes takerAssetData;
+        bytes makerAssetData;
     }
-
-    bytes32 public constant LIMIT_ORDER_TYPEHASH =
-        keccak256(
-            "Order(uint256 salt,address takerAsset,address makerAsset,bytes takerAssetData,bytes makerAssetData,bytes getTakerAmount,bytes getMakerAmount,bytes predicate,bytes permit,bytes interaction)"
-        );
 
     bytes32 public constant LIMIT_ORDER_RFQ_TYPEHASH =
         keccak256(
@@ -232,11 +227,7 @@ contract LLDEXProtocol is
             makingAmount =
                 (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
                 orderTakerAmount;
-        }
-        // else if (takingAmount == 0) {
-        //     //takingAmount = (makingAmount * orderTakerAmount) / orderMakerAmount;
-        // }
-        else {
+        } else {
             revert("LOP: one of amounts should be 0");
         }
 
@@ -244,45 +235,11 @@ contract LLDEXProtocol is
             takingAmount > 0 && makingAmount > 0,
             "LOP: can't swap 0 amount"
         );
+
         require(
             takingAmount <= orderTakerAmount,
             "LOP: taking amount exceeded"
         );
-
-        // require(
-        //     makingAmount <= orderMakerAmount,
-        //     "LOP: making amount exceeded"
-        // );
-
-        // if (makingAmount == 0 && takingAmount == 0) {
-        //     // Two zeros means whole order
-        //     takingAmount = orderTakerAmount;
-        //     makingAmount = orderMakerAmount;
-        // } else if (makingAmount == 0) {
-        //     makingAmount =
-        //         (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
-        //         orderTakerAmount;
-        // } else if (takingAmount == 0) {
-        //     // If making amount is specified, taking amount should stay the same as in signed RFQ order
-        //     takingAmount = orderTakerAmount;
-        // } else {
-        //     revert("LOP: one of amounts should be 0");
-        // }
-
-        // require(
-        //     takingAmount > 0 && makingAmount > 0,
-        //     "LOP: can't swap 0 amount"
-        // );
-        // require(
-        //     takingAmount <= orderTakerAmount,
-        //     "LOP: taking amount exceeded"
-        // );
-
-        // Let maker make transaction for bigger quote than order makingAmount
-        // require(
-        //     makingAmount >= orderMakerAmount,
-        //     "LOP: making amount exceeded"
-        // );
 
         // Validate order
         bytes32 orderHash = _hash(order);
@@ -487,29 +444,6 @@ contract LLDEXProtocol is
                 "LOP: bad signature"
             );
         }
-
-        // address taker = _sessions[
-        //     address(takerAssetData.decodeAddress(_FROM_INDEX))
-        // ].sessionKey;
-        // if (
-        //     (signature.length != 65 && signature.length != 64) ||
-        //     SilentECDSA.recover(orderHash, signature) != taker
-        // ) {
-        //     bytes memory result = taker.uncheckedFunctionStaticCall(
-        //         abi.encodeWithSelector(
-        //             IERC1271.isValidSignature.selector,
-        //             orderHash,
-        //             signature
-        //         ),
-        //         "LOP: isValidSignature failed"
-        //     );
-        //     require(
-        //         result.length == 32 &&
-        //             abi.decode(result, (bytes4)) ==
-        //             IERC1271.isValidSignature.selector,
-        //         "LOP: bad signature"
-        //     );
-        // }
     }
 
     function _callTakerAssetTransferFrom(

@@ -9,6 +9,7 @@ import { ConnectionInfo } from '../../models/connection-info';
 import { PubnubService } from '../pubnub/pubnub.service';
 import { FEE_TOKEN_ADDRESS, FRONTEND_ADDRESS, LIMITORDERPROTOCOL_ADDRESS, PUBNUB_QUOTE_EXECUTION_MARKER } from '../../constants/config.constants';
 import Decimal from 'decimal.js';
+import { MessageService } from 'primeng/api';
 
 const ABIERC20: string[] = [
   "function allowance(address _owner, address _spender) public view returns (uint256 remaining)",
@@ -30,7 +31,8 @@ export class BlockchainService {
   constructor(@Inject(WEB3PROVIDER) private web3Provide,
               private providerService: ProviderService,
               private sessionService: SessionService,
-              private pubnubService: PubnubService) {
+              private pubnubService: PubnubService,
+              private messageService: MessageService) {
   }
 
   isExtensionInstalled(): boolean {
@@ -45,8 +47,31 @@ export class BlockchainService {
     return this.web3Provide.request({method: 'eth_requestAccounts'});
   }
 
+  validatePrivateKey(privateKey: string): boolean {
+      try {
+        new ethers.Wallet(privateKey.replace('0x', ''), this.providerService)
+
+        return true;
+    } catch (err) {
+        return false
+    }
+  }
+
   async getSignerAddress() {
     return await this.providerService.getSigner(0).getAddress();
+  }
+
+  async getChainName() {
+    const network = await this.providerService.getNetwork();
+
+    if (network.name == 'unknown') {
+      switch (network.chainId) {
+        case 1666600000: return 'Harmony Mainnet Shard0'
+        case 1666700000: return 'Harmony Testnet Shard0'
+      }
+    }
+
+    return network.name
   }
 
   async updateAllowance(data: any, type: number, allowance: number){
@@ -162,8 +187,6 @@ export class BlockchainService {
         sender: uuid
       }
     })
-
-
   }
 
 }

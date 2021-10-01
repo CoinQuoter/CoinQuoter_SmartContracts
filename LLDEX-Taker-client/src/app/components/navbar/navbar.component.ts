@@ -20,6 +20,7 @@ export class NavbarComponent implements OnInit {
   sessionPublicKey: string;
   expirationTimeStamp: Date;
   shortWalletAddress: string;
+  chainName: string;
   walletAddress: string;
 
   constructor(private sessionService: SessionService,
@@ -33,13 +34,20 @@ export class NavbarComponent implements OnInit {
     if(this.blockchainService.isExtensionInstalled()){
       this.blockchainService.getSignerAddress().then(() => {
         this.setWallet();
+        this.setChainName();
         const LOPContract = this.sessionService.getLOPContract();
         const signer = this.providerService.getSigner(0);
         signer.getAddress().then((address) => {
           LOPContract.connect(signer).sessionExpirationTime(address).then((expirationTime) => {
             this.expirationTimeStamp = new Date(Number(expirationTime.toString()) * 1000);
             const dateNow = new Date().getTime() / 1000;
-            if (expirationTime > dateNow) {
+            const session = this.sessionService.getSessionDetails();
+
+            if (expirationTime > dateNow && 
+                session && 
+                session.session_private_key &&
+                this.blockchainService.validatePrivateKey(session.session_private_key)
+              ) {
               this.session = true;
               this.sessionService.setIsSession(true);
               this.address = address;
@@ -65,28 +73,6 @@ export class NavbarComponent implements OnInit {
         });
       }).catch(() => 'error');
     }
-    // this.sessionService.isSession().then((isSession) => {
-    //   console.log(isSession);
-    //   this.session = isSession;
-    //   if(this.session) {
-    //     this.sessionService.getTimeLeft().then((timeLeft) => {
-    //       this.timeLeft = timeLeft;
-    //       let timer = setInterval(() => {
-    //         this.timeLeft -= 1000;
-    //         if( this.timeLeft <= 0 ) {
-    //           this.sessionService.clearStorage();
-    //           this.session = false;
-    //           window.location.reload();
-    //           clearInterval(timer);
-    //         }
-    //       }, 1000);
-    //     });
-    //     const session = this.sessionService.getSessionDetails();
-    //     this.address = session.session_creator;
-    //     this.sessionPublicKey = session.session_public_key;
-    //     this.expirationTimeStamp = this.sessionService.getExpirationTimeStamp();
-    //   }
-    // });
   }
 
   getCountdown(): string {
@@ -120,10 +106,17 @@ export class NavbarComponent implements OnInit {
       })
     }
   }
+
   async setWallet() {
     this.walletAddress = await this.blockchainService.getSignerAddress()
     this.shortWalletAddress = this.walletAddress.slice(0, 6) + "..." + this.walletAddress.slice(-4);
   }
+
+  async setChainName() {
+    this.chainName = (await this.blockchainService.getChainName())
+    console.log(this.chainName);
+  }
+
 
   endSession() {
     this.sessionService.endSession().then(() => window.location.reload());

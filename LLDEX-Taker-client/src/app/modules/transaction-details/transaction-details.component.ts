@@ -112,11 +112,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
             const currentContact = this.isOperationAsk() ? buyTokenContract : sellTokenContract;
 
             this.maxLiquidity = this.isOperationAsk() ? this.data.maxToken0 : this.data.maxToken1;
-
             this.maxLiquidity = this.isOperationAsk() ? (this.maxLiquidity * this.data.bid)*0.99 : (this.maxLiquidity/this.data.ask)*0.99;
-
-            console.log("this.data.maxToken0: " + this.data.maxToken0);
-            console.log("this.data.maxToken1: " + this.data.maxToken1);
 
             this.approveAmount = this.helperService.toNumber(
               await this.blockchainService.getAllowanceAmount(currentContact, this.data.contractAddress)

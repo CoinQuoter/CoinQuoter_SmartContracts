@@ -11,6 +11,8 @@ import { TradeData, TradeDataService } from '../../shared/services/trade-data/tr
 import { ExecutionDataService } from '../../shared/services/execution-data/execution-data.service';
 import Decimal from 'decimal.js';
 import { PubnubQuoteConfig } from 'app/shared/constants/config.constants';
+import { SessionService } from 'app/shared/services/session/session.service';
+import { MessageService } from 'primeng/api';
 
 @Component({
   selector: 'app-trade',
@@ -45,10 +47,11 @@ export class TradeComponent implements OnInit, OnDestroy {
               private helperService: HelperService,
               private route: ActivatedRoute,
               private liveRateService: PubnubService,
-              private providerService: ProviderService,
+              private sessionService: SessionService,
               private blockchainService: BlockchainService,
               private tradeDataService: TradeDataService,
-              private executionDataService: ExecutionDataService) { }
+              private executionDataService: ExecutionDataService,
+              private messageService: MessageService) { }
 
   ngOnInit(): void {
     this.initVariables();
@@ -122,6 +125,17 @@ export class TradeComponent implements OnInit, OnDestroy {
   }
 
   executeTrade() {
+    const session = this.sessionService.getSessionDetails();
+    if (!session) {
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Invalid session',
+          detail: 'Session private key is missing'
+        })
+
+      return
+    }
+
     this.executionDataService.setData({
       type: this.operation,
       data: this.data,
