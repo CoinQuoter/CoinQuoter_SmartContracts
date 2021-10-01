@@ -1,15 +1,15 @@
-# LLDEX
+# LLDEX 
+*Track 1: Cross-Chain - “Liquidity” : https://gitcoin.co/issue/harmony-one/hackathon/18/100026313*
 
-Full documentation of the project can be found on: https://lldex.gitbook.io/lldex/
-
-Demo video: .....
-
-Low Latency DEX was designed during Harmony Hackathon: https://gitcoin.co/hackathon/harmony-defi/projects/9385/low-latency-p2p-dex
-Hacketon side note: Design of LLDEX allows for a very good integration with Hummingbot that was inicialy planed, but due to limited resources we decided to just focus on the core leaving integrations for a latter stages.
+### **VIDEO WALKTHROUGH** **https://youtu.be/I5acn8AKZz4**
+### **Production on [Harmony Mainnet]** **[https://lldex.org/](https://lldex.org/)**
+### **Docs** **https://docs.lldex.org/**
 
 Connect with us on social media to stay up to date:
 * [Twitter](https://twitter.com/kamilchels)
 * [Discord](https://discord.gg/UjBjFmVa)
+
+We have not managed to connect LLDEX with Hummibot, but LLDEX is perfectly fitted for that
 
 # What is LLDEX?
 
