@@ -19,8 +19,6 @@ import "./libraries/UncheckedAddress.sol";
 import "./libraries/ArgumentsDecoder.sol";
 import "./libraries/SilentECDSA.sol";
 
-import "hardhat/console.sol";
-
 // @title LLDEX Protocol v1
 contract LLDEXProtocol is
     ImmutableOwner(address(this)),
@@ -105,34 +103,31 @@ contract LLDEXProtocol is
         return _invalidator[taker][slot];
     }
 
-    /**
-     * @notice Calls every target with corresponding data. Then reverts with CALL_RESULTS_0101011 where zeroes and ones
-     * denote failure or success of the corresponding call
-     * @param targets Array of addresses that will be called
-     * @param data Array of data that will be passed to each call
-     */
-    function simulateCalls(address[] calldata targets, bytes[] calldata data)
-        external
-    {
-        require(targets.length == data.length, "LOP: array size mismatch");
-        bytes memory reason = new bytes(targets.length);
-        for (uint256 i = 0; i < targets.length; i++) {
-            // solhint-disable-next-line avoid-low-level-calls
-            (bool success, bytes memory result) = targets[i].call(data[i]);
-            if (success && result.length > 0) {
-                success = abi.decode(result, (bool));
-            }
-            reason[i] = success ? bytes1("1") : bytes1("0");
-        }
-
-        // Always revert and provide per call results
-        revert(string(abi.encodePacked("CALL_RESULTS_", reason)));
-    }
-
     /// @notice Cancels order's quote
     function cancelOrderRFQ(uint256 orderInfo) external {
         _invalidator[msg.sender][uint64(orderInfo) >> 8] |= (1 <<
             (orderInfo & 0xff));
+    }
+
+    function testSignature(OrderRFQ memory order, bytes calldata signature)
+        public
+        view
+        returns (
+            bytes32 orderHash,
+            address signer,
+            uint256 chainId
+        )
+    {
+        // Validate order
+        orderHash = _hash(order);
+        signer = SilentECDSA.recover(orderHash, signature);
+        chainId = block.chainid;
+        // _validate(
+        //     order.takerAssetData,
+        //     order.makerAssetData,
+        //     signature,
+        //     orderHash
+        // );
     }
 
     /// @notice Fills order's quote, fully or partially (whichever is possible)
@@ -430,7 +425,7 @@ contract LLDEXProtocol is
                     orderHash,
                     signature
                 ),
-                "LOP: bad signature"
+                "LOP: SNE bad signature "
             );
         } else {
             // Sesssion is expired
@@ -441,7 +436,7 @@ contract LLDEXProtocol is
                     orderHash,
                     signature
                 ),
-                "LOP: bad signature"
+                "LOP: SE bad signature"
             );
         }
     }

@@ -1,5 +1,3 @@
-import Decimal from "decimal.js";
-
 export interface DealBlotterRow {
     takerAddress: string;
     orderType: string;

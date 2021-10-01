@@ -9,7 +9,7 @@ module.exports = {
             import: './src/rt_maker.ts',
             //dependOn: 'shared',
         },
-        rt_client: './src/rt_client.ts',
+        // rt_client: './src/rt_client.ts',
     },
     devtool: 'source-map',
     module: {

@@ -13,5 +13,6 @@ export interface LimitOrder {
         amount1Dec: number,
         maxToken0: Decimal,
         maxToken1: Decimal,
+        gasFee: string,
         contractAddress: string
 }
