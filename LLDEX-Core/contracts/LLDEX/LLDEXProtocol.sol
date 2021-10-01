@@ -109,27 +109,6 @@ contract LLDEXProtocol is
             (orderInfo & 0xff));
     }
 
-    function testSignature(OrderRFQ memory order, bytes calldata signature)
-        public
-        view
-        returns (
-            bytes32 orderHash,
-            address signer,
-            uint256 chainId
-        )
-    {
-        // Validate order
-        orderHash = _hash(order);
-        signer = SilentECDSA.recover(orderHash, signature);
-        chainId = block.chainid;
-        // _validate(
-        //     order.takerAssetData,
-        //     order.makerAssetData,
-        //     signature,
-        //     orderHash
-        // );
-    }
-
     /// @notice Fills order's quote, fully or partially (whichever is possible)
     /// @param order Order quote to fill
     /// @param signature Signature to confirm quote ownership
