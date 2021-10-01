@@ -1,7 +1,7 @@
 # LLDEX 
 *Track 1: Cross-Chain - “Liquidity” : https://gitcoin.co/issue/harmony-one/hackathon/18/100026313*
 
-### **VIDEO WALKTHROUGH** **https://youtu.be/I5acn8AKZz4**
+### **VIDEO WALKTHROUGH** **https://youtu.be/k-k8Yl2mJgE**
 ### **Production on [Harmony Mainnet]** **[https://lldex.org/](https://lldex.org/)**
 ### **Docs** **https://docs.lldex.org/**
 
