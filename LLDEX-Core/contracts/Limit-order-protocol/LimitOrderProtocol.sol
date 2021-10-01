@@ -21,8 +21,8 @@ import "./libraries/SilentECDSA.sol";
 
 import "hardhat/console.sol";
 
-/// @title 1inch Limit Order Protocol v1
-contract LimitOrderProtocol is
+// @title LLDEX Protocol v1
+contract LLDEXProtocol is
     ImmutableOwner(address(this)),
     EIP712("1inch Limit Order Protocol", "1"),
     AmountCalculator,

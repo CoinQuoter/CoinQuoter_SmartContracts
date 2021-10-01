@@ -67,7 +67,7 @@
            style="font-size: 2.5rem"
            *ngIf="status == 'confirmed'"></i>
         <i class="pi pi-times-circle text-red-800 py-1"
-           style="font-size: 2.5rem" *ngIf="status == 'rejected'"></i>
+           style="font-size: 2.5rem" *ngIf="status == 'rejected' || status == 'failed'"></i>
         <h2 class="font-bold text-xl">Transaction {{status.toLowerCase()}}
         </h2>
     </div>
@@ -96,7 +96,7 @@
     <div class="text-center my-4">
       <a href="#" class="underline text-gray-400 hover:text-gray-600 font-semibold">Go to transaction history</a>
     </div>
-    <div class="text-center my-4" *ngIf="status == 'confirmed'">
+    <div class="text-center my-4" *ngIf="status == 'confirmed' || status == 'posted'">
       <a href="https://explorer.harmony.one/tx/{{hash}}" target="_blank" class="underline text-gray-400 hover:text-gray-600 font-semibold">View on Etherscan</a>
     </div>
     <div class="my-5">

@@ -5,6 +5,7 @@ import { EOperationType } from '../../shared/enums/operation-type.constants';
 import { PubnubService } from '../../shared/services/pubnub/pubnub.service';
 import { ConnectionInfo } from '../../shared/models/connection-info';
 import { BlockchainService } from '../../shared/services/blockchain/blockchain.service';
+import { PubnubOrdersConfig } from 'app/shared/constants/config.constants';
 
 @Component({
   selector: 'app-transaction-status',
@@ -44,20 +45,46 @@ export class TransactionStatusComponent implements OnInit {
     this.tradeDate = new Date();
     const executionData = this.executionDataService.getData();
     const tradeData = this.tradeDataService.getData();
+    const orderId = this.generateOrderId();
     this.config = executionData.config;
     this.data = executionData.data;
 
-    this.pubnubService.connect(this.config).addListener({message: async event => {
+    const orderStatusConfig = {
+      title: orderId.toString(),
+      settings: {
+        channels: [orderId.toString()],
+        withPresence: true,
+      }
+    }
+
+    const pubnubClient = this.pubnubService.connect(orderStatusConfig, PubnubOrdersConfig);
+    
+    pubnubClient.addListener({message: async event => {
           const message = event.message.content;
           this.data = event.message.content.data;
 
-          if(message.type == "transaction_posted") this.status = "posted";
-          else if(message.type == "transaction_filled") {
-            this.status = "confirmed";
-            this.hash = this.data.hash;
+          switch (message.type) {
+            case "transaction_posted": {
+              this.status = "posted";
+              this.hash = this.data.hash;
+            } break;
+            case "transaction_filled": {
+              this.status = "confirmed";
+              this.hash = this.data.hash;
+
+              pubnubClient.unsubscribe(orderStatusConfig.settings);
+            } break;
+            case "transaction_failed": {
+              this.status = "failed";
+
+              pubnubClient.unsubscribe(orderStatusConfig.settings);
+            } break;
+            case "transaction_rejected": {
+              this.status = "rejected";
+
+              pubnubClient.unsubscribe(orderStatusConfig.settings);
+            }
           }
-          else if(message.type == "transaction_failed") this.status = "failed";
-          else if(message.type == "transaction_rejected") this.status = "rejected";
       }});
 
     [this.base, this.quote] = tradeData.pair.split("/");
@@ -71,8 +98,14 @@ export class TransactionStatusComponent implements OnInit {
     this.type = executionData.type;
     this.gasPrice = executionData.gasPrice;
 
-    this.blockchainService.publishMessageToMaker(this.type, this.data, this.sellAmount, this.buyAmount, this.config);
+    this.blockchainService.publishMessageToMaker(orderId, this.type, this.data, this.sellAmount, this.buyAmount, this.config);
   }
 
+  generateOrderId(): number {
+    const _array = new Uint32Array(1);
+    window.crypto.getRandomValues(_array);
+    const orderId = _array[0];
 
+    return orderId;
+  }
 }

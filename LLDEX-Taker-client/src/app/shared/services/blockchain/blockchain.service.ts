@@ -7,7 +7,7 @@ import Web3 from 'web3';
 import { LimitOrderBuilder, PrivateKeyProviderConnector } from '../../../../../../limit-order-protocol-utils/dist';
 import { ConnectionInfo } from '../../models/connection-info';
 import { PubnubService } from '../pubnub/pubnub.service';
-import { FEE_TOKEN_ADDRESS, FRONTEND_ADDRESS, LIMITORDERPROTOCOL_ADDRESS } from '../../constants/config.constants';
+import { FEE_TOKEN_ADDRESS, FRONTEND_ADDRESS, LIMITORDERPROTOCOL_ADDRESS, PUBNUB_QUOTE_EXECUTION_MARKER } from '../../constants/config.constants';
 import Decimal from 'decimal.js';
 
 const ABIERC20: string[] = [
@@ -85,7 +85,7 @@ export class BlockchainService {
     }
   }
 
-  async sign1InchOrder(type: EOperationType, data: any, amountInput: number, amountOutput: number) {
+  async sign1InchOrder(orderId: number, type: EOperationType, data: any, amountInput: number, amountOutput: number) {
     const session = this.sessionService.getSessionDetails();
     const sessionPrivateKey = session.session_private_key.replace("0x", "");
 
@@ -106,12 +106,8 @@ export class BlockchainService {
         ? [data.amount1Address, data.amount0Address]
         : [data.amount0Address, data.amount1Address]
 
-    let array = new Uint32Array(1);
-    window.crypto.getRandomValues(array);
-
-
     const limitOrder = limitOrderBuilder.buildRFQOrder({
-      id: array[0],
+      id: orderId,
       expiresInTimestamp: Math.round(new Date().getTime() / 1000) + 1800,
       takerAssetAddress: takerAssetAddress,
       makerAssetAddress: makerAssetAddress,
@@ -138,15 +134,18 @@ export class BlockchainService {
     }
   }
 
-  async publishMessageToMaker(type: EOperationType,
+  async publishMessageToMaker(orderId: number,
+                              type: EOperationType,
                               data: any,
                               amountInput: number,
                               amountOutput: number,
                               config: ConnectionInfo) {
-    const oneInchOrder = await this.sign1InchOrder(type, data, amountInput, amountOutput);
+    const oneInchOrder = await this.sign1InchOrder(orderId, type, data, amountInput, amountOutput);
     const uuid = this.pubnubService.getUUID();
-    this.pubnubService.publishData(config,{
-      channel: config.settings.channels[0],
+    const channelName = config.settings.channels[0] + PUBNUB_QUOTE_EXECUTION_MARKER;
+
+    this.pubnubService.publishData(config, {
+      channel: channelName,
       message: {
         content: {
           type: "action",

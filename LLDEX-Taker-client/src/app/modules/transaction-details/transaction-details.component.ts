@@ -7,15 +7,13 @@ import { AllowanceDialogComponent } from './allowance-dialog/allowance-dialog.co
 import { ActivatedRoute, Router } from '@angular/router';
 import { PubnubService } from '../../shared/services/pubnub/pubnub.service';
 import { ConnectionInfo } from '../../shared/models/connection-info';
-import { BigNumber, ethers } from 'ethers';
 import { BlockchainService } from '../../shared/services/blockchain/blockchain.service';
 import { CreateSessionDialogComponent } from '../../shared/components/create-session-dialog/create-session-dialog.component';
 import { SessionService } from '../../shared/services/session/session.service';
 import { HelperService } from '../../shared/services/helper/helper.service';
 import { EOperationType } from '../../shared/enums/operation-type.constants';
 import { TradeDataService } from '../../shared/services/trade-data/trade-data.service';
-import { FILLORDER_RFQ_ESTIMATED_GAS_USAGE } from '../../shared/constants/config.constants';
-import { } from '../../shared/extensions/to-significant-digits';
+import { FILLORDER_RFQ_ESTIMATED_GAS_USAGE, PubnubQuoteConfig } from '../../shared/constants/config.constants';
 import { take } from 'rxjs/operators';
 
 @Component({
@@ -97,9 +95,9 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
 
   getBasicContractsInfo() {
     this.connectionInfo = this.getConnectionInfo();
-    this.pubnubClient = this.pubnubService.connect(this.connectionInfo)
+    this.pubnubClient = this.pubnubService.connect(this.connectionInfo, PubnubQuoteConfig)
       this.pubnubClient.addListener({message: async event => {
-        if(event.message.content.type == "stream_depth"){
+        if(event.message.content.type == "stream_depth") {
           this.data = event.message.content.data;
           this.blockButton = false;
 
@@ -116,6 +114,9 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
             this.maxLiquidity = this.isOperationAsk() ? this.data.maxToken0 : this.data.maxToken1;
 
             this.maxLiquidity = this.isOperationAsk() ? (this.maxLiquidity * this.data.bid)*0.99 : (this.maxLiquidity/this.data.ask)*0.99;
+
+            console.log("this.data.maxToken0: " + this.data.maxToken0);
+            console.log("this.data.maxToken1: " + this.data.maxToken1);
 
             this.approveAmount = this.helperService.toNumber(
               await this.blockchainService.getAllowanceAmount(currentContact, this.data.contractAddress)
@@ -204,7 +205,9 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   clearTransactionData() {
     this.bidRate = 0;
     this.askRate = 0;
+    this.baseBalance = 0;
     this.sellBalance = 0;
+    this.quoteBalance = 0;
 
     this.form.get('sellAmount').setValue(0)
   }

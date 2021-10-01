@@ -10,6 +10,7 @@ import { ProviderService, WEB3PROVIDER } from '../../shared/services/provider/pr
 import { TradeData, TradeDataService } from '../../shared/services/trade-data/trade-data.service';
 import { ExecutionDataService } from '../../shared/services/execution-data/execution-data.service';
 import Decimal from 'decimal.js';
+import { PubnubQuoteConfig } from 'app/shared/constants/config.constants';
 
 @Component({
   selector: 'app-trade',
@@ -56,8 +57,9 @@ export class TradeComponent implements OnInit, OnDestroy {
     [this.base, this.quote] = this.connectionInfo.title.split("/");
 
     [this.sellToken, this.buyToken] = this.isOperationAsk() ? [this.quote, this.base] : [this.base, this.quote];
+    
 
-    this.pubnubClient = this.liveRateService.connect(this.connectionInfo)
+    this.pubnubClient = this.liveRateService.connect(this.connectionInfo, PubnubQuoteConfig)
     this.pubnubClient .addListener({ message: async event => {
       if(event.message.content.type == "stream_depth") {
         this.data = event.message.content.data;

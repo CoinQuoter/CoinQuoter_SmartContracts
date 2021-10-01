@@ -2,7 +2,8 @@ import { Injectable } from '@angular/core';
 import * as PubNub from "pubnub";
 import { ConnectionInfo } from '../../models/connection-info';
 import { ELocalstorageNames } from '../../enums/localstorage-names.constants';
-import { PubnubConfig } from '../../constants/config.constants';
+import { PubnubQuoteConfig, PubnubOrdersConfig } from '../../constants/config.constants';
+import { PubNubKeyset } from 'app/shared/models/pubnub-keyset';
 
 @Injectable({
   providedIn: 'root'
@@ -17,20 +18,20 @@ export class PubnubService {
     return uuid;
   }
 
-  connect(config: ConnectionInfo): PubNub {
-    const pubnub_client = this.createClient(config);
+  connect(config: ConnectionInfo, keyset: PubNubKeyset): PubNub {
+    const pubnub_client = this.createClient(keyset);
     pubnub_client.subscribe(config.settings);
     return pubnub_client;
   }
 
-  private createClient(config: ConnectionInfo) {
+  private createClient(keyset: PubNubKeyset) {
     const uuid = this.getUUID();
-    const pubNubConfigClient = {...PubnubConfig, uuid: uuid};
+    const pubNubConfigClient = {...keyset, uuid: uuid};
     return new PubNub(pubNubConfigClient);
   }
 
   publishData(config: ConnectionInfo, data: any) {
-    const pubnub_client = this.createClient(config);
+    const pubnub_client = this.createClient(PubnubOrdersConfig);
     pubnub_client.publish(data);
   }
 

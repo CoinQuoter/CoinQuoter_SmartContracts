@@ -3,6 +3,7 @@ import { PubnubService } from '../../../shared/services/pubnub/pubnub.service';
 import { ConnectionInfo } from '../../../shared/models/connection-info';
 import { DatePipe } from '@angular/common';
 import { EOperationType } from '../../../shared/enums/operation-type.constants';
+import { PubnubQuoteConfig } from 'app/shared/constants/config.constants';
 
 @Component({
   selector: 'app-exchange-rate',
@@ -29,7 +30,7 @@ export class ExchangeRateComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.today = this.datePipe.transform(new Date(), 'd MMM').toUpperCase();
-    this.pubnubClient = this.liveRateService.connect(this.connection)
+    this.pubnubClient = this.liveRateService.connect(this.connection, PubnubQuoteConfig)
     this.pubnubClient.addListener({message: event => {
         this.lastDifference = this.difference;
         this.bidRate = event.message.content.data.bid;
