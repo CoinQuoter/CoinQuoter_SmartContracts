@@ -26,16 +26,22 @@ export class SessionService {
   }
 
 
-  async createSession(date: Date) {
+  async createSession(date: Date): Promise<any> {
     const LOPContract = new ethers.Contract(LIMITORDERPROTOCOL_ADDRESS, ABILOP, this.providerService);
     const signer = this.providerService.getSigner(0);
     const wallet = ethers.Wallet.createRandom();
     const expirationTime = Math.round(date.getTime()/1000);
 
     const result = await LOPContract.connect(signer).createOrUpdateSession(wallet.address, expirationTime);
-    await this.providerService.waitForTransaction(result.hash);
+    return {
+       sessionPromise: this.waitForSession(result.hash, wallet, signer),
+       walletAddress: wallet.address
+    }
+  }
 
-    // localStorage.setItem(ELocalstorageNames.SESSION_EXPIRE_TIME, date.toString());
+  async waitForSession(hash: string, wallet: ethers.Wallet, signer: ethers.providers.JsonRpcSigner) {
+    await this.providerService.waitForTransaction(hash);
+
     localStorage.setItem(ELocalstorageNames.SESSION_TAKER, JSON.stringify({
       session_private_key: wallet.privateKey,
       session_public_key: wallet.address,
@@ -48,27 +54,17 @@ export class SessionService {
     const signer = this.providerService.getSigner(0);
 
     const result = await LOPContract.connect(signer).endSession();
-    await this.providerService.waitForTransaction(result.hash);
+    return {
+      promise: this.waitForTermination(result.hash)
+    }
+  }
 
-    localStorage.clear();
+  async waitForTermination(hash: string) {
+      await this.providerService.waitForTransaction(hash);
+      localStorage.clear()
   }
 
   isSession() {
-    // console.log(this.session);
-    // if(typeof this.session === 'undefined'){
-    //
-    // }
-    // const LOPContract = this.getLOPContract();
-    // const signer = this.providerService.getSigner(0);
-    // signer.getAddress().then((address) => {
-    //   LOPContract.connect(signer).sessionExpirationTime(address).then((expirationTime) => {
-    //     const expirationDate = new Date(Number(expirationTime.toString()) * 1000);
-    //     const dateNow = new Date().getTime() / 1000;
-    //     if (expirationTime > dateNow) {
-    //       session = true;
-    //     }
-    //   })
-    // });
     return this.session;
   }
 
@@ -76,10 +72,6 @@ export class SessionService {
     const time = localStorage.getItem(ELocalstorageNames.SESSION_EXPIRE_TIME);
     return new Date(time).getTime() - new Date().getTime()
   }
-
-  // getExpirationTimeStamp() {
-  //   return localStorage.getItem(ELocalstorageNames.SESSION_EXPIRE_TIME);
-  // }
 
   clearStorage() {
     localStorage.removeItem(ELocalstorageNames.SESSION_EXPIRE_TIME);

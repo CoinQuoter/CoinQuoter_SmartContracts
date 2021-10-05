@@ -1,6 +1,4 @@
 export enum ECurrencyPair {
-  // WETH_DAI = 'WETH/DAI',
-  // WETH_LLDEX = 'WETH/LLDEX'
   ONE_USDT = 'WONE/1USDT',
   ONE_BTC = 'WONE/1WBTC',
   ETH_BTC = '1ETH/1WBTC',

@@ -67,3 +67,4 @@ import 'zone.js';  // Included with Angular CLI.
 global.Buffer = global.Buffer || require('buffer').Buffer;
 import * as process from 'process';
 window['process'] = process;
+import 'document-register-element';

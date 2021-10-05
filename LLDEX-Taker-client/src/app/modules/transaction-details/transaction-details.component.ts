@@ -15,6 +15,7 @@ import { EOperationType } from '../../shared/enums/operation-type.constants';
 import { TradeDataService } from '../../shared/services/trade-data/trade-data.service';
 import { FILLORDER_RFQ_ESTIMATED_GAS_USAGE, PubnubQuoteConfig } from '../../shared/constants/config.constants';
 import { take } from 'rxjs/operators';
+import { MessageService } from 'primeng/api';
 
 @Component({
   selector: 'app-transaction-details',
@@ -36,9 +37,12 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   approveAmount: number;
   allowanceDisplay: boolean;
   selectedPair: string;
+  approvalStatus: string;
+  sessionStatus: string;
   operation: number;
   connectionInfo: ConnectionInfo;
 
+  sellTokenBalance: number;
   ethBalance: number;
   baseBalance: number;
   quoteBalance: number;
@@ -50,6 +54,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   gasPrice: number;
   blockButton: boolean;
   maxLiquidity: number;
+  balanceLoader: boolean;
 
   constructor(private formBuilder: FormBuilder,
               @Inject(WEB3PROVIDER) private web3Provider,
@@ -61,7 +66,8 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
               private pubnubService: PubnubService,
               private sessionService: SessionService,
               private helperService: HelperService,
-              private tradeDataService: TradeDataService) { }
+              private tradeDataService: TradeDataService,
+              private messageService: MessageService) { }
 
   ngOnInit(): void {
     this.initVariables();
@@ -76,6 +82,10 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   }
 
   initVariables() {
+    this.approvalStatus = 'idle';
+    this.sessionStatus = 'idle';
+
+    this.sellTokenBalance = 0;
     this.approveAmount = 0.5;
     this.ethBalance = 0;
     this.baseBalance = 0;
@@ -88,9 +98,9 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
 
     this.blockButton = true;
     this.allowanceDisplay = false;
+    this.balanceLoader = true;
     this.currencies = Object.values(ECurrencyPair);
     this.selectedPair = this.currencies[0];
-
   }
 
   getBasicContractsInfo() {
@@ -104,9 +114,8 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
           this.helperService.setAccuracy(this.isOperationAsk() ? this.data.amount1Dec : this.data.amount0Dec);
 
           this.gasPrice = (0 * FILLORDER_RFQ_ESTIMATED_GAS_USAGE);
-          let sellTokenBalance = 0;
 
-          if(this.isWalletConnected()){
+          if (this.isWalletConnected()) {
             const sellTokenContract = this.blockchainService.getERC20Contract(this.data.amount0Address);
             const buyTokenContract = this.blockchainService.getERC20Contract(this.data.amount1Address);
             const currentContact = this.isOperationAsk() ? buyTokenContract : sellTokenContract;
@@ -123,7 +132,9 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
 
             [this.baseBalance, this.quoteBalance] = [sellBalance, buyBalance];
             this.sellBalance = this.isOperationAsk() ? buyBalance : sellBalance;
-            sellTokenBalance = this.isOperationAsk() ? buyBalance : sellBalance;
+            this.sellTokenBalance = this.isOperationAsk() ? buyBalance : sellBalance;
+
+            this.balanceLoader = false;
           }
           [this.bidRate, this.askRate] = [this.data.bid.toString(), this.data.ask.toString()];
 
@@ -131,7 +142,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
           formSellAmount.setValidators([
             Validators.required,
             this.allowanceValidator(this.approveAmount),
-            this.sellTokenBalanceValidator(sellTokenBalance),
+            this.sellTokenBalanceValidator(this.sellTokenBalance),
             this.liquidityValidator(this.maxLiquidity)])
         }
         }
@@ -155,7 +166,9 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   }
 
   changeCurrencySides(buttonType: number) {
-    if(!this.isOperationSelected(buttonType)){
+    if (!this.isOperationSelected(buttonType)) {
+      this.balanceLoader = true;
+
       [this.sellToken, this.buyToken] = [this.buyToken, this.sellToken];
       this.operation = this.isOperationAsk() ? EOperationType.BID : EOperationType.ASK;
       this.router.navigate([], {relativeTo: this.route, queryParams:
@@ -185,6 +198,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   }
 
   changePair() {
+    this.balanceLoader = true;
     const pair = this.helperService.pairToParam(this.form.get('currencyPair').value);
 
     this.clearTransactionData();
@@ -219,19 +233,68 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
         clientInfo: this.data,
         operation: this.operation
       }
-    }).onClose.pipe(take(1)).subscribe(() => {
-        const formSellAmount = this.form.get('sellAmount');
-        formSellAmount.setValue(formSellAmount.value);
-        formSellAmount.updateValueAndValidity();
-        formSellAmount.markAsTouched();
+    }).onClose
+      .pipe(take(1))
+      .subscribe((promise) => {
+        if (!promise)
+          return;
+
+        this.approvalStatus = 'waiting';
+
+        promise
+          .then(() => this.onApproved(this.form.get("sellAmount").value))
+          .catch(() => this.onApprovalFailed())
     });
+  }
+
+  onApproved(approvedAmount: number) {
+    this.approvalStatus = 'idle';
+
+    this.messageService.add({
+      severity: 'success',
+      summary: 'Allowance updated',
+      detail: 'Allowance updated successfully.'
+    })
+
+    const formSellAmount = this.form.get('sellAmount');
+
+    formSellAmount.setValidators(
+      [
+        Validators.required,
+        this.allowanceValidator(approvedAmount),
+        this.sellTokenBalanceValidator(this.sellTokenBalance),
+        this.liquidityValidator(this.maxLiquidity)
+      ]
+    )
+
+    formSellAmount.setValue(approvedAmount);
+    formSellAmount.updateValueAndValidity();
+    formSellAmount.markAsTouched();
+  }
+
+  onApprovalFailed() {
+    this.approvalStatus = 'idle';
+
+    this.messageService.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'There was an error during this operation.'
+    })
   }
 
   showCreateSessionDialog() {
     const ref = this.dialogService.open(CreateSessionDialogComponent, {
       header: 'Start session',
       width: '40vw',
-    })
+    }).onClose.pipe(take(1)).subscribe((sessionPromise) => {
+      if (!sessionPromise)
+        return;
+
+      this.sessionStatus = 'waiting';
+      sessionPromise
+        .then(() => window.location.reload())
+        .catch(() => this.sessionStatus = 'idle');
+    });
   }
 
   isSession() {

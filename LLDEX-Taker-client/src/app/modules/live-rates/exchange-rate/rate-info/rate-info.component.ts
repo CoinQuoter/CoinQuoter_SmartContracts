@@ -61,7 +61,7 @@ export class RateInfoComponent implements OnInit {
     if(this.blockchainService.isLogged()){
       this.changeRoute();
     }else{
-      if(this.blockchainService.isExtensionInstalled()){
+      if(this.blockchainService.isProviderAvailable()){
         this.confirmationService.confirm({
           header: "Connection",
           message: "You are not connected with MetaMask. Would you like to log in?",

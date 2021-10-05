@@ -6,7 +6,6 @@ import { ValidationMessagePipe } from './pipes/validation-message.pipe';
 import { NoExtensionInstalledDialogComponent } from './components/no-extension-installed-dialog/no-extension-installed-dialog.component';
 
 
-
 @NgModule({
   declarations: [
     StepsComponent,

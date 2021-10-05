@@ -2,16 +2,12 @@ import { Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { DynamicDialogRef } from 'primeng/dynamicdialog';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { SessionService } from '../../services/session/session.service';
-import { ethers } from 'ethers';
-import { ProviderService } from '../../services/provider/provider.service';
-import { BlockchainService } from '../../services/blockchain/blockchain.service';
-
 
 @Component({
   selector: 'app-create-session-dialog',
   templateUrl: './create-session-dialog.component.html',
   styleUrls: ['./create-session-dialog.component.scss'],
-  encapsulation: ViewEncapsulation.None
+  encapsulation: ViewEncapsulation.None,
 })
 export class CreateSessionDialogComponent implements OnInit {
 
@@ -20,15 +16,18 @@ export class CreateSessionDialogComponent implements OnInit {
   sessionTime: number;
   expirationDate: Date;
   formEnable: boolean;
+  sessionStatus: string;
 
   constructor(public ref: DynamicDialogRef,
               private sessionService: SessionService,
-              private formBuilder: FormBuilder) { }
+              private formBuilder: FormBuilder
+              ) { }
 
   ngOnInit(): void {
     this.selectedButton = 1;
     this.formEnable = true;
     this.sessionTime = 300;
+    this.sessionStatus = 'idle';
     this.form = this.formBuilder.group({
       sessionLength: [null]
     })
@@ -45,10 +44,16 @@ export class CreateSessionDialogComponent implements OnInit {
   }
 
   createSession() {
+    this.sessionStatus = 'waiting';
+
     this.formEnable = false;
     this.expirationDate = this.getSessionExpire();
     this.sessionService.createSession(this.expirationDate)
-      .then(() => window.location.reload());
+      .then((data) => {
+        if (data.sessionPromise)
+          this.ref.close(data.sessionPromise);
+      })
+      .catch((_) => this.sessionStatus = 'idle');
   }
 
   changeButton(value: number) {

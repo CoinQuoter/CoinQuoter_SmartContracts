@@ -7,7 +7,7 @@ import Web3 from 'web3';
 import { LimitOrderBuilder, PrivateKeyProviderConnector } from '../../../../../../limit-order-protocol-utils/dist';
 import { ConnectionInfo } from '../../models/connection-info';
 import { PubnubService } from '../pubnub/pubnub.service';
-import { FEE_TOKEN_ADDRESS, FRONTEND_ADDRESS, LIMITORDERPROTOCOL_ADDRESS, PUBNUB_QUOTE_EXECUTION_MARKER } from '../../constants/config.constants';
+import { FEE_TOKEN_ADDRESS, FRONTEND_ADDRESS, LIMITORDERPROTOCOL_ADDRESS, PUBNUB_QUOTE_EXECUTION_MARKER, SUPPORTED_NETWORKS } from '../../constants/config.constants';
 import Decimal from 'decimal.js';
 import { MessageService } from 'primeng/api';
 
@@ -27,34 +27,63 @@ declare global {
   providedIn: 'root'
 })
 export class BlockchainService {
+  private chainId: number;
 
   constructor(@Inject(WEB3PROVIDER) private web3Provide,
               private providerService: ProviderService,
               private sessionService: SessionService,
-              private pubnubService: PubnubService,
-              private messageService: MessageService) {
+              private pubnubService: PubnubService) {
+    this.chainId = -1;
+    this._updateChainId();
   }
 
-  isExtensionInstalled(): boolean {
+  _updateChainId() {
+    this.providerService.getNetwork()
+      .then((network) => {
+      this.chainId = network.chainId
+    })
+  }
+
+  isProviderAvailable(): boolean {
     return !!this.web3Provide;
   }
 
   isLogged(): boolean {
-    return this.isExtensionInstalled() && !!this.web3Provide._state.accounts && this.web3Provide._state.accounts.length > 0;
+    return this.isProviderAvailable() && !!this.web3Provide._state.accounts && this.web3Provide._state.accounts.length > 0;
   }
 
   requestAccount() {
     return this.web3Provide.request({method: 'eth_requestAccounts'});
   }
 
-  validatePrivateKey(privateKey: string): boolean {
+  validatePrivateKey(privateKey: string, publicKey: string): boolean {
       try {
-        new ethers.Wallet(privateKey.replace('0x', ''), this.providerService)
+        const wallet = new ethers.Wallet(privateKey.replace('0x', ''), this.providerService);
 
-        return true;
+        return wallet.address == publicKey;
     } catch (err) {
-        return false
+        return false;
     }
+  }
+
+  onAccountChanged(fnc: (accounts: any) => void) {
+    if (!this.isProviderAvailable())
+      return;
+
+    window.ethereum.on('accountsChanged', async (accounts: any) => {
+        fnc(accounts);
+    })
+  }
+
+  onChainChanged(fnc: (newChainId: number, oldChainId: number) => void) {
+    if (!this.isProviderAvailable())
+      return;
+
+    this.providerService.on("network", (newNetwork, oldNetwork) => {
+        this.chainId = newNetwork.chainId;
+
+      fnc(this.chainId, oldNetwork?.chainId ?? -1);
+    })
   }
 
   async getSignerAddress() {
@@ -74,14 +103,22 @@ export class BlockchainService {
     return network.name
   }
 
+  isChainSupported() {
+    return SUPPORTED_NETWORKS.filter(x => x == this.chainId).length != 0;
+  }
+
   async updateAllowance(data: any, type: number, allowance: number){
     const address = type == EOperationType.BID ? data.amount0Address : data.amount1Address;
     const decimals = type == EOperationType.BID ? data.amount0Dec : data.amount1Dec;
     const tokenContract = new ethers.Contract(address, ABIERC20, this.providerService);
 
     const newAllowance = Number(allowance * Math.pow(10, decimals));
-    const result = await tokenContract.connect(this.providerService.getSigner(0)).approve(data.contractAddress, newAllowance.toLocaleString('fullwide', {useGrouping:false}));
-    await this.providerService.waitForTransaction(result.hash);
+    const result = await tokenContract.connect(this.providerService.getSigner(0))
+      .approve(data.contractAddress, newAllowance.toLocaleString('fullwide', {useGrouping:false}));
+
+    return {
+      promise: this.providerService.waitForTransaction(result.hash)
+    }
   }
 
   getERC20Contract(address: string) {

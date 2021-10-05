@@ -1,8 +1,8 @@
-import { NgModule } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
+import { CUSTOM_ELEMENTS_SCHEMA, Injector, NgModule } from '@angular/core';
 
 import { AppComponent } from './app.component';
 import { RouterModule } from "@angular/router";
+import { createCustomElement } from "@angular/elements";
 import { APP_ROUTES } from "./app.routing";
 import { NavbarComponent } from './components/navbar/navbar.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
@@ -13,6 +13,8 @@ import { OverlayPanelModule } from 'primeng/overlaypanel';
 import { DialogService } from 'primeng/dynamicdialog';
 import { FormBuilder } from '@angular/forms';
 import { ToastModule } from 'primeng/toast';
+import { SharedBrowserSpinnerModule } from './shared/shared.browser.spinner.module';
+import { LoaderComponent } from './shared/components/loader/loader/loader.component';
 
 export function enableWeb3Provider(provider) {
   return () => {
@@ -26,20 +28,25 @@ export function enableWeb3Provider(provider) {
     NavbarComponent
   ],
   imports: [
-    BrowserModule,
     BrowserAnimationsModule,
     RouterModule.forRoot(APP_ROUTES),
     StepsModule,
     ConfirmDialogModule,
     OverlayPanelModule,
-    ToastModule
+    ToastModule,
+    SharedBrowserSpinnerModule
   ],
   providers: [
     ConfirmationService,
     DialogService,
     FormBuilder,
-    MessageService
+    MessageService,
   ],
-  bootstrap: [AppComponent]
+  bootstrap: [AppComponent],
 })
-export class AppModule { }
+export class AppModule { 
+  constructor(private injector: Injector) {
+  }
+
+  ngDoBootstrap() {}
+}

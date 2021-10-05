@@ -13,12 +13,12 @@
       <img alt="up"
            src="assets/image/caret-up-green.svg"
            [ngClass]="{'opacity-0': !isDifferenceBigger() }"
-           width="13%"/>
+           width="18px"/>
       <div class="difference text-white">{{ difference | number }}</div>
       <img alt="up"
            [ngClass]="{'opacity-0': !isDifferenceLower() }"
            src="assets/image/caret-down-red.svg"
-           width="13%"/>
+           width="18px"/>
     </div>
     <app-rate-info
       [price]="askRate"

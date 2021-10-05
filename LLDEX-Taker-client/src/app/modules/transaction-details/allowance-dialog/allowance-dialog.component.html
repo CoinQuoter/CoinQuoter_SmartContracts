@@ -3,11 +3,6 @@
       Approve {{ currencyName }} to allow trade settlement up to approved amount.
     </div>
     <div class="my-5 mb-7 flex justify-center">
-<!--        <p-inputNumber formControlName="amount"-->
-<!--                       styleClass="w-100"-->
-<!--                       [showButtons]="true"-->
-<!--                       [step]="0.001"-->
-<!--                       [min]="0"></p-inputNumber>-->
       <input type="number"
              class="py-2.5 px-4 w-40 rounded bg-dark-light text-white focus:outline-none"
              style="text-align: center;"
@@ -15,6 +10,9 @@
              formControlName="amount"/>
     </div>
     <div class="flex justify-center">
-      <button type="button" class="btn-primary" (click)="updateAllowance()">Approve {{ currencyName }}</button>
+      <button type="button" class="btn-primary" (click)="updateAllowance()" [disabled]="status != 'idle'">
+        <p *ngIf="status == 'idle'">Approve {{ currencyName }}</p>
+        <spinner-circular *ngIf="status == 'waiting'"></spinner-circular>
+      </button>
     </div>
 </form>

@@ -93,9 +93,9 @@
     <div class="text-center mt-12 mb-8 font-bold text-2xl">
       Price: {{ price }}
     </div>
-    <div class="text-center my-4">
+    <!-- <div class="text-center my-4">
       <a href="#" class="underline text-gray-400 hover:text-gray-600 font-semibold">Go to transaction history</a>
-    </div>
+    </div> -->
     <div class="text-center my-4" *ngIf="status == 'confirmed' || status == 'posted'">
       <a href="https://explorer.harmony.one/tx/{{hash}}" target="_blank" class="underline text-gray-400 hover:text-gray-600 font-semibold">View on Etherscan</a>
     </div>

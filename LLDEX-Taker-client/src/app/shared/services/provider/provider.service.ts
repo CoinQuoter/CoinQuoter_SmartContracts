@@ -14,6 +14,6 @@ export class ProviderService extends providers.Web3Provider{
   web3Provider = WEB3PROVIDER;
 
   constructor(@Inject(WEB3PROVIDER) web3Provider) {
-    super(web3Provider ?? ethers.providers.Provider);
+    super(web3Provider ?? ethers.providers.Provider, "any");
   }
 }

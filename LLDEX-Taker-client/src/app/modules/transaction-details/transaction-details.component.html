@@ -1,100 +1,3 @@
-<!--<app-steps [activeIndex]=1></app-steps>-->
-<!--<form action="" class="my-4" [formGroup]="form">-->
-
-<!--  <div class="form-group">-->
-<!--    <p-dropdown-->
-<!--      styleClass="form-control"-->
-<!--      formControlName="currencyPair"-->
-<!--      [options]="currencies"-->
-<!--      (onChange)="changePair()"></p-dropdown>-->
-<!--  </div>-->
-
-<!--  <div class="row justify-content-center align-items-center py-3">-->
-<!--    <div class="col-auto">SELL | {{ sellToken }}</div>-->
-<!--    <div class="col-auto">-->
-<!--      <button class="btn btn-primary" (click)="changeCurrencySides()">SWITCH</button>-->
-<!--    </div>-->
-<!--    <div class="col-auto">{{ buyToken }} | BUY</div>-->
-<!--  </div>-->
-
-<!--  <div class="row align-items-center my-3 mb-4">-->
-
-<!--    <div class="col">-->
-<!--      <div>I sell</div>-->
-<!--      <p-inputNumber formControlName="sellAmount"-->
-<!--                     minFractionDigits="3"-->
-<!--                     maxFractionDigits="15"-->
-<!--                     [showButtons]="true"-->
-<!--                     [step]="0.001"-->
-<!--                     [min]="0"></p-inputNumber>-->
-<!--      {{ sellToken }}-->
-<!--      <div class="text-danger">-->
-<!--        <span *ngIf="form.controls.sellAmount.invalid">-->
-<!--          {{ form.controls.sellAmount.errors | validationMessage }}-->
-<!--        </span>-->
-<!--        <span>&nbsp;</span>-->
-<!--      </div>-->
-<!--    </div>-->
-
-<!--    <div class="col row align-items-center">-->
-<!--      <div class="col-6">-->
-<!--        Approved<br/> {{ approveAmount }} {{ sellToken }}-->
-<!--        <div class="text-danger">-->
-<!--          <span *ngIf="form.controls.sellAmount.hasError('allowance')">-->
-<!--            Allowance too low-->
-<!--          </span>-->
-<!--          <span></span>-->
-<!--        </div>-->
-<!--      </div>-->
-<!--      <div class="col-6">-->
-<!--        <button class="btn btn-primary" [disabled]="!isSession()" (click)="showAllowanceDialog()">Approve {{ sellToken }}</button>-->
-<!--      </div>-->
-<!--    </div>-->
-<!--  </div>-->
-
-<!--  <div class="row">-->
-<!--    <div class="col-6">-->
-
-<!--      <div class="row align-items-center my-4">-->
-<!--        <div class="col">EHT Balance: <strong>{{ ethBalance }}</strong></div>-->
-<!--        <div class="col">-->
-<!--          <button class="btn btn-primary w-100" [disabled]="!isSession()">Wrap ETH</button>-->
-<!--        </div>-->
-<!--      </div>-->
-
-<!--      <div class="row align-items-center mt-4">-->
-<!--        <div class="col">{{ base }} Balance: <strong>{{ baseBalance }}</strong></div>-->
-<!--        <div class="col">-->
-<!--          <button class="btn btn-primary w-100" [disabled]="!isSession()">Unwrap {{ sellToken }}</button>-->
-<!--        </div>-->
-<!--      </div>-->
-<!--    </div>-->
-<!--    <div class="col-6">-->
-<!--      <div class="row">-->
-<!--        <div class="col-6 my-4 text-center">-->
-<!--          <div>Indicative bid</div>-->
-<!--          <div><strong>{{ bidRate | number}}</strong></div>-->
-<!--        </div>-->
-<!--        <div class="col-6 my-4 text-center">-->
-<!--          <div>Indicative ask</div>-->
-<!--          <div><strong>{{ askRate | number}}</strong></div>-->
-<!--        </div>-->
-<!--      </div>-->
-<!--      <div class="row">-->
-<!--        <div class="col-6 text-center">-->
-<!--          Max Liquidity: 0-->
-<!--        </div>-->
-<!--      </div>-->
-<!--    </div>-->
-<!--  </div>-->
-<!--  <div class="row align-items-center my-4">-->
-<!--    <div class="col">{{ quote }} Balance: <strong>{{ quoteBalance }}</strong></div>-->
-<!--    <div class="col">-->
-<!--      <button class="btn btn-primary w-100" (click)="showCreateSessionDialog()" *ngIf="!isSession()" >CREATE SESSION</button>-->
-<!--      <button class="btn btn-primary w-100" [disabled]="disableQuote()" *ngIf="isSession()" (click)="getQuote()">GET QUOTE</button>-->
-<!--    </div>-->
-<!--  </div>-->
-<!--</form>-->
 <div class="flex justify-center mt-12">
   <div class="rounded bg-dark w-1/4 py-1 px-4"  style="max-width: 475px">
     <form action="" class="my-4" [formGroup]="form">
@@ -159,7 +62,9 @@
 
       <div class="flex justify-between text-sm my-2" style="padding-bottom: 20px;"  *ngIf="isWalletConnected()">
         <div class="text-gray-400">Balance: </div>
-        <div class="font-semibold text-white">{{ sellBalance | number: '1.1-6' }} {{ sellToken }}</div>
+        <div class="font-semibold text-white" *ngIf="!balanceLoader">{{ sellBalance | number: '1.1-6' }} {{ sellToken }}</div>
+        <spinner-circular *ngIf="balanceLoader"></spinner-circular>
+        
       </div>
 
       <div class="flex justify-between text-sm mb-2">
@@ -180,13 +85,26 @@
         <button type="button" class="py-2.5 w-full bg-main text-white rounded hover:bg-main-light"
                 (click)="showCreateSessionDialog()"
                 *ngIf="isWalletConnected() && !isSession() && !form.controls.sellAmount.hasError('allowance')"
-                >Start session</button>
+                [disabled] = "sessionStatus != 'idle'"
+                >
+                  <p *ngIf="sessionStatus == 'idle'">Start session</p>
+                  <div class="container mx-auto flex justify-center items-center" *ngIf="sessionStatus == 'waiting'">
+                    <spinner-circular class="px-2"></spinner-circular>
+                    <p>Pending...</p>
+                  </div>
+        </button>
 
         <button type="button" class="py-2.5 w-full bg-main text-white rounded disabled:opacity-50 hover:bg-main-light"
                 (click)="showAllowanceDialog()"
                 *ngIf="form.controls.sellAmount.hasError('allowance')"
-                [disabled]="blockButton"
-                >Approve {{ sellToken }}</button>
+                [disabled]="blockButton || approvalStatus != 'idle'"
+                >
+                <p *ngIf="approvalStatus == 'idle'">Approve {{ sellToken }}</p>
+                <div class="container flex justify-center items-center" *ngIf="approvalStatus == 'waiting'">
+                  <spinner-circular class="px-2"></spinner-circular>
+                  <p>Waiting for approval finality</p>
+                </div>
+        </button>
 
         <button type="button" class="py-2.5 w-full bg-main text-white rounded disabled:opacity-50 hover:bg-main-light"
                 (click)="getQuote()"

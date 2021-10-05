@@ -18,16 +18,28 @@ export class MetamaskGuardService implements CanActivate{
 
   canActivate(route: ActivatedRouteSnapshot,
               state: RouterStateSnapshot): boolean {
-      if(this.blockchainService.isExtensionInstalled()){
-        return true;
+      if (!this.blockchainService.isProviderAvailable()
+      ) {
+        this.router.navigate(['/']).then(() => {
+          this.messageService.add({
+            severity: "warn",
+            summary: "Warning",
+            detail: "No wallet extension is installed"
+          })
+        });
       }
-      this.router.navigate(['/']).then(() => {
-        this.messageService.add({
-          severity: "warn",
-          summary: "Warning",
-          detail: "No wallet extension is installed"
-        })
-      });
-      return false;
+
+      if (!this.blockchainService.isChainSupported()) {
+        this.router.navigate(['/']).then(() => {
+          this.messageService.add({
+            severity: "warn",
+            summary: "Warning",
+            detail: "Invalid network - please switch to supported network"
+          })
+        });
+      }
+      
+
+      return true;
   }
 }

@@ -1,3 +1,7 @@
+<div class="w-100 flex justify-center items-center" style="height: 40px; background-color:rgb(241, 58, 95)" *ngIf="!chainSupported">
+  <h2 class="text-sm text-white text-center">Network {{chainName}} is not supported! Please switch to Harmony Mainnet</h2>
+</div>
+
 <nav class="py-5 px-12">
   <div class="container mx-auto flex justify-between items-center">
     <div class="flex items-center">
@@ -18,19 +22,28 @@
         Connect to a wallet
       </div>
 
-      <div class="px-5 pt-2.5 pb-1.5 bg-main rounded text-white cursor-pointer hover:bg-main-light"
-           *ngIf="!session && isWalletConnected()" (click)="showCreateSessionDialog()">
-        Start session
+      <div class="px-2 pt-2.5 pb-1.5 bg-main rounded text-white cursor-pointer hover:bg-main-light"
+           *ngIf="!session && isWalletConnected() && isNetworkSupported()" (click)="sessionStatus == 'idle' && showCreateSessionDialog()">
+            <p *ngIf="sessionStatus == 'idle'">Start session</p>
+            <div class="container mx-auto flex justify-between items-center" *ngIf="sessionStatus == 'waiting'">
+              <spinner-circular class="px-2"></spinner-circular>
+              <p>Pending...</p>
+            </div>
       </div>
 
 
-      <div *ngIf="session" (click)="op.toggle($event)" class="px-5 pt-2 pb-1.5 bg-gray-900 border-2 border-gray-700 rounded-full text-white cursor-pointer font-bold flex">
-        {{ getCountdown() }}
+      <div *ngIf="session && isNetworkSupported()" (click)="terminationStatus == 'idle' && op.toggle($event)" 
+      class="px-5 pt-2 pb-1.5 bg-gray-900 border-2 border-gray-700 rounded-full text-white cursor-pointer font-bold flex">
+        <p *ngIf="terminationStatus == 'idle' || terminationStatus == 'waiting'">{{ getCountdown() }}</p>
+        <div class="container mx-auto flex justify-between items-center" *ngIf="terminationStatus == 'completing'">
+          <spinner-circular class="px-2"></spinner-circular>
+          <p>Terminating session...</p>
+        </div>
       </div>
 
       <div class="border-2 border-l-0 border-gray-700 rounded-full text-white bg-gray-900 cursor-pointer font-bold flex"
            [title]="walletAddress"
-           *ngIf="isWalletConnected()">
+           *ngIf="isWalletConnected() && isNetworkSupported()">
         <div class="w-10 h-10 bg-white rounded-full">&nbsp;</div>
         <div class="py-2 px-3">{{ shortWalletAddress }}</div>
         <div class="py-2 px-3 text-gray-400">{{ chainName }}</div>
@@ -54,7 +67,12 @@
     <div class="text-center text-white"><strong>{{ getCountdown() }}</strong></div>
 
     <div class="flex justify-center mt-4">
-      <button class="px-5 pt-2.5 pb-2 bg-main rounded text-white cursor-pointer hover:bg-main-light" (click)="endSession()">Terminate session</button>
+      <button class="px-5 pt-2.5 pb-2 bg-main rounded text-white cursor-pointer hover:bg-main-light" 
+          (click)="endSession()" 
+          [disabled]="terminationStatus != 'idle'">
+        <p *ngIf="terminationStatus == 'idle'">Terminate session</p>
+        <spinner-circular *ngIf="terminationStatus == 'waiting'"></spinner-circular>
+      </button>
     </div>
   </ng-template>
 </p-overlayPanel>
