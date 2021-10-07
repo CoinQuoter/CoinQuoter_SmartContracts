@@ -28,6 +28,9 @@ export default class Config {
     static pubNubOrderPublishKey: string = "pub-c-ff397b4e-99d7-4995-90d1-bd157c6eb6c3"
     static pubNubOrderSubscribeKey: string = "sub-c-c72e4772-21b4-11ec-925a-3eee4c94e219"
 
+    static networkScannerURL: string = "https://explorer.harmony.one/tx"
+    static defaultNetwork: string = "https://api.harmony.one";
+    static defaultChainId: number = 1666600000;
     static limitOrderProtocolAddress: string = "0xbFE71f56Fd7670BBB2C76A44067d633F1B44F765"
     static fillOrderRFQEstimatedGasUsage: number = /*139333*/ 0
     static signWithPrivateKey: boolean = true;
@@ -40,11 +43,11 @@ export default class Config {
             token1: "0x3c2b8be99c50593081eaa2a724f0b8285f5aba8f",
             token0Dec: 0,
             token1Dec: 0,
-            slippage: new Decimal("0.0005"),
-            spreadBid: new Decimal("0.005"),
-            spreadAsk: new Decimal("0.004"),
-            maxToken0: new Decimal("5.0"),
-            maxToken1: new Decimal("0.5"),
+            slippage: new Decimal("0.05"),
+            spreadBid: new Decimal("0.0"),
+            spreadAsk: new Decimal("0.0"),
+            maxToken0: new Decimal("500000"),
+            maxToken1: new Decimal("500000"),
             mappingBinance: "oneusdt",
             channelName: "one-usdt-10"
         },
@@ -53,11 +56,11 @@ export default class Config {
             token1: "0x3095c7557bcb296ccc6e363de01b760ba031f2d9",
             token0Dec: 0,
             token1Dec: 0,
-            slippage: new Decimal("0.001"),
-            spreadBid: new Decimal("0.000000004"),
-            spreadAsk: new Decimal("0.000000008"),
-            maxToken0: new Decimal("0.00005"),
-            maxToken1: new Decimal("0.00005"),
+            slippage: new Decimal("0.05"),
+            spreadBid: new Decimal("0.0"),
+            spreadAsk: new Decimal("0.0"),
+            maxToken0: new Decimal("500000"),
+            maxToken1: new Decimal("500000"),
             mappingBinance: "onebtc",
             channelName: "one-btc-10"
         },
@@ -66,11 +69,11 @@ export default class Config {
             token1: "0x3095c7557bcb296ccc6e363de01b760ba031f2d9",
             token0Dec: 0,
             token1Dec: 0,
-            slippage: new Decimal("0.001"),
-            spreadBid: new Decimal("0.00005"),
-            spreadAsk: new Decimal("0.00003"),
-            maxToken0: new Decimal("0.00005"),
-            maxToken1: new Decimal("0.00005"),
+            slippage: new Decimal("0.05"),
+            spreadBid: new Decimal("0.0"),
+            spreadAsk: new Decimal("0.0"),
+            maxToken0: new Decimal("500000"),
+            maxToken1: new Decimal("500000"),
             mappingBinance: "ethbtc",
             channelName: "eth-btc-10"
         },
@@ -79,11 +82,11 @@ export default class Config {
             token1: "0x3c2b8be99c50593081eaa2a724f0b8285f5aba8f",
             token0Dec: 0,
             token1Dec: 0,
-            slippage: new Decimal("0.001"),
-            spreadBid: new Decimal("0.05"),
-            spreadAsk: new Decimal("0.03"),
-            maxToken0: new Decimal("0.00005"),
-            maxToken1: new Decimal("4"),
+            slippage: new Decimal("0.05"),
+            spreadBid: new Decimal("0.0"),
+            spreadAsk: new Decimal("0.0"),
+            maxToken0: new Decimal("500000"),
+            maxToken1: new Decimal("500000"),
             mappingBinance: "ethusdt",
             channelName: "eth-usdt-10"
         },
@@ -92,11 +95,11 @@ export default class Config {
             token1: "0x3c2b8be99c50593081eaa2a724f0b8285f5aba8f",
             token0Dec: 0,
             token1Dec: 0,
-            slippage: new Decimal("0.001"),
-            spreadBid: new Decimal("0.05"),
-            spreadAsk: new Decimal("0.03"),
-            maxToken0: new Decimal("0.00005"),
-            maxToken1: new Decimal("4"),
+            slippage: new Decimal("0.05"),
+            spreadBid: new Decimal("0.0"),
+            spreadAsk: new Decimal("0.0"),
+            maxToken0: new Decimal("500000"),
+            maxToken1: new Decimal("500000"),
             mappingBinance: "btcusdt",
             channelName: "btc-usdt-10"
         }
