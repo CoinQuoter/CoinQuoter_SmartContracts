@@ -503,7 +503,7 @@ contract LLDEXProtocol is
                 "LOP: SNE bad signature "
             );
         } else {
-            // Sesssion is expired
+            // Sesssion is expired - checking if market taker has signed the request with it's own private key (used to save gas on the market taker side)
 
             require(
                 SignatureChecker.isValidSignatureNow(
