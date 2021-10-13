@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts_v42/interfaces/IERC1271.sol";
-import "@openzeppelin/contracts_v42/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts_v42/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts_v42/token/ERC20/extensions/draft-ERC20Permit.sol";
-import "@openzeppelin/contracts_v42/utils/cryptography/SignatureChecker.sol";
+import "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
+import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
 import "./helpers/AmountCalculator.sol";
 import "./helpers/ChainlinkCalculator.sol";
@@ -22,7 +22,7 @@ import "./libraries/SilentECDSA.sol";
 // @title LLDEX Protocol v1
 contract LLDEXProtocol is
     ImmutableOwner(address(this)),
-    EIP712("LLDEX Protocol", "2"),
+    EIP712("1inch Limit Order Protocol", "1"),
     AmountCalculator,
     ChainlinkCalculator,
     ERC1155Proxy,
@@ -66,6 +66,11 @@ contract LLDEXProtocol is
         address frontendAddress;
         bytes takerAssetData;
         bytes makerAssetData;
+    }
+
+    struct OrderRFQAmounts {
+        uint256 takingAmount;
+        uint256 makingAmount;
     }
 
     bytes32 public constant LIMIT_ORDER_RFQ_TYPEHASH =
@@ -124,13 +129,47 @@ contract LLDEXProtocol is
         makerSessionNotExpired(order, signature)
         returns (uint256, uint256)
     {
+        OrderRFQAmounts memory amounts = OrderRFQAmounts({
+            takingAmount: takingAmount,
+            makingAmount: makingAmount
+        });
+
+        return fillOrderRFQTo(order, amounts, signature, msg.sender);
+    }
+
+    /// @notice Fills order's quote, fully or partially (whichever is possible) and calls external contract function
+    /// @param order Order quote to fill
+    /// @param signature Signature to confirm quote ownership
+    /// @param takingAmount Taking amount
+    /// @param makingAmount Making amount
+    /// @param receiver Address of contract that will receive the call after successful validation of RFQ order and transfer from taker to maker
+    /// @param data external call data
+
+    function fillOrderRFQCallPeriphery(
+        OrderRFQ memory order,
+        bytes calldata signature,
+        uint256 takingAmount,
+        uint256 makingAmount,
+        address receiver,
+        bytes calldata data
+    )
+        external
+        makerSessionNotExpired(order, signature)
+        returns (uint256, uint256)
+    {
+        OrderRFQAmounts memory amounts = OrderRFQAmounts({
+            takingAmount: takingAmount,
+            makingAmount: makingAmount
+        });
+
         return
-            fillOrderRFQTo(
+            fillOrderRFQToWithCallback(
                 order,
+                amounts,
                 signature,
-                takingAmount,
-                makingAmount,
-                msg.sender
+                msg.sender,
+                receiver,
+                data
             );
     }
 
@@ -143,23 +182,80 @@ contract LLDEXProtocol is
         bytes calldata permit
     ) external returns (uint256, uint256) {
         _permit(permit);
-        return
-            fillOrderRFQTo(
-                order,
-                signature,
-                takingAmount,
-                makingAmount,
-                target
-            );
+
+        OrderRFQAmounts memory amounts = OrderRFQAmounts({
+            takingAmount: takingAmount,
+            makingAmount: makingAmount
+        });
+
+        return fillOrderRFQTo(order, amounts, signature, target);
+    }
+
+    function fillOrderRFQToWithCallback(
+        OrderRFQ memory order,
+        OrderRFQAmounts memory amounts,
+        bytes calldata signature,
+        address target,
+        address receiver,
+        bytes calldata data
+    ) private returns (uint256, uint256) {
+        bytes32 orderHash = _validateRFQOrder(order, amounts, signature);
+
+        // Transfer Taker => Maker
+        _callTakerAssetTransferFrom(
+            order.takerAsset,
+            order.takerAssetData,
+            target,
+            amounts.takingAmount
+        );
+
+        receiver.uncheckedFunctionCall(data, "LOP: External call failed");
+
+        // Transfer Maker => Taker
+        _callMakerAssetTransferFrom(
+            order.makerAsset,
+            order.makerAssetData,
+            amounts.makingAmount
+        );
+
+        _finishRFQOrder(order, amounts, orderHash);
+
+        return (amounts.takingAmount, amounts.makingAmount);
     }
 
     function fillOrderRFQTo(
         OrderRFQ memory order,
+        OrderRFQAmounts memory amounts,
         bytes calldata signature,
-        uint256 takingAmount,
-        uint256 makingAmount,
         address target
-    ) public returns (uint256, uint256) {
+    ) private returns (uint256, uint256) {
+        bytes32 orderHash = _validateRFQOrder(order, amounts, signature);
+
+        // Transfer Taker => Maker
+        _callTakerAssetTransferFrom(
+            order.takerAsset,
+            order.takerAssetData,
+            target,
+            amounts.takingAmount
+        );
+
+        // Transfer Maker => Taker
+        _callMakerAssetTransferFrom(
+            order.makerAsset,
+            order.makerAssetData,
+            amounts.makingAmount
+        );
+
+        _finishRFQOrder(order, amounts, orderHash);
+
+        return (amounts.takingAmount, amounts.makingAmount);
+    }
+
+    function _validateRFQOrder(
+        OrderRFQ memory order,
+        OrderRFQAmounts memory amounts,
+        bytes calldata signature
+    ) internal returns (bytes32 orderHash) {
         // Check time expiration
         uint256 expiration = uint128(order.info) >> 64;
         require(
@@ -186,59 +282,56 @@ contract LLDEXProtocol is
             _AMOUNT_INDEX
         );
 
-        if (makingAmount == 0 && takingAmount == 0) {
+        if (amounts.makingAmount == 0 && amounts.takingAmount == 0) {
             // Two zeros means whole order
-            takingAmount = orderTakerAmount;
-            makingAmount = orderMakerAmount;
+            amounts.takingAmount = orderTakerAmount;
+            amounts.makingAmount = orderMakerAmount;
         } else if (
-            takingAmount != 0 &&
-            (makingAmount >
-                (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
+            amounts.takingAmount != 0 &&
+            (amounts.makingAmount >
+                (amounts.takingAmount *
+                    orderMakerAmount +
+                    orderTakerAmount -
+                    1) /
                     orderTakerAmount)
         ) {
             // Partial fill with positive slippage
-        } else if (makingAmount == 0) {
-            makingAmount =
-                (takingAmount * orderMakerAmount + orderTakerAmount - 1) /
+        } else if (amounts.makingAmount == 0) {
+            amounts.makingAmount =
+                (amounts.takingAmount *
+                    orderMakerAmount +
+                    orderTakerAmount -
+                    1) /
                 orderTakerAmount;
         } else {
             revert("LOP: one of amounts should be 0");
         }
 
         require(
-            takingAmount > 0 && makingAmount > 0,
+            amounts.takingAmount > 0 && amounts.makingAmount > 0,
             "LOP: can't swap 0 amount"
         );
 
         require(
-            takingAmount <= orderTakerAmount,
+            amounts.takingAmount <= orderTakerAmount,
             "LOP: taking amount exceeded"
         );
 
         // Validate order
-        bytes32 orderHash = _hash(order);
+        orderHash = _hash(order);
         _validate(
             order.takerAssetData,
             order.makerAssetData,
             signature,
             orderHash
         );
+    }
 
-        // Transfer Taker => Maker
-        _callTakerAssetTransferFrom(
-            order.takerAsset,
-            order.takerAssetData,
-            target,
-            takingAmount
-        );
-
-        // Transfer Maker => Taker
-        _callMakerAssetTransferFrom(
-            order.makerAsset,
-            order.makerAssetData,
-            makingAmount
-        );
-
+    function _finishRFQOrder(
+        OrderRFQ memory order,
+        OrderRFQAmounts memory amounts,
+        bytes32 orderHash
+    ) internal {
         // Withdraw fee
         _withdrawFee(
             order.makerAssetData.decodeAddress(_TO_INDEX),
@@ -249,8 +342,11 @@ contract LLDEXProtocol is
 
         _updateSessionTransactions(order.takerAssetData, order.makerAssetData);
 
-        emit OrderFilledRFQ(orderHash, takingAmount, makingAmount);
-        return (takingAmount, makingAmount);
+        emit OrderFilledRFQ(
+            orderHash,
+            amounts.takingAmount,
+            amounts.makingAmount
+        );
     }
 
     function createOrUpdateSession(address sessionKey, uint256 expirationTime)

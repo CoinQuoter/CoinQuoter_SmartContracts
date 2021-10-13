@@ -1,12 +1,12 @@
 import { PubNubKeyset } from "../models/pubnub-keyset";
 
 export const PubnubQuoteConfig: PubNubKeyset = {
-  subscribeKey: "sub-c-4e55a09a-22a7-11ec-880d-a65b09ab59bc",
+  subscribeKey: "sub-c-ca71f2ac-282c-11ec-b636-021bdbd01fcd",
 }
 
 export const PubnubOrdersConfig: PubNubKeyset = {
-  subscribeKey: "sub-c-c72e4772-21b4-11ec-925a-3eee4c94e219",
-  publishKey: "pub-c-ff397b4e-99d7-4995-90d1-bd157c6eb6c3"
+  subscribeKey: "sub-c-260a2832-282d-11ec-bfec-fa2d187f6aa6",
+  publishKey: "pub-c-1275ee5a-d148-46a0-aac9-2544cb7ca08c"
 }
 
 export const PUBNUB_QUOTE_EXECUTION_MARKER = "-quote-executions"
