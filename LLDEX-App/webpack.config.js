@@ -4,12 +4,9 @@ const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 
 module.exports = {
     entry: {
-        //shared: './src/utils/order_decoder.ts',
         rt_maker: {
             import: './src/rt_maker.ts',
-            //dependOn: 'shared',
         },
-        // rt_client: './src/rt_client.ts',
     },
     devtool: 'source-map',
     module: {
