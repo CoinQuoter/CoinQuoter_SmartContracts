@@ -25,8 +25,8 @@ export default class Config {
     /*
         Order status keyset
     */
-    static pubNubOrderPublishKey: string = "pub-c-ff397b4e-99d7-4995-90d1-bd157c6eb6c3"
-    static pubNubOrderSubscribeKey: string = "sub-c-c72e4772-21b4-11ec-925a-3eee4c94e219"
+    static pubNubOrderPublishKey: string = "pub-c-1275ee5a-d148-46a0-aac9-2544cb7ca08c"
+    static pubNubOrderSubscribeKey: string = "sub-c-260a2832-282d-11ec-bfec-fa2d187f6aa6"
 
     static networkScannerURL: string = "https://explorer.harmony.one/tx"
     static defaultNetwork: string = "https://api.harmony.one";
