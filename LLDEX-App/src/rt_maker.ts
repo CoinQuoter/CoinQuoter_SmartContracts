@@ -4,6 +4,7 @@ import { BinanceStreamSnapshot } from './models/binance_stream_snapshot'
 import { TokenPair } from './models/token_pair';
 import { html, render } from 'lit'
 import { RFQOrder } from 'limit-order-protocol-lldex'
+import MakerConfig from './Maker_Config.json'
 
 import PubNub from 'pubnub'
 import Decimal from 'decimal.js'
@@ -182,13 +183,54 @@ async function _confirmOrder(
             return;
         }
 
-        const result = await contract.connect(signer).fillOrderRFQ(
+        //await _approveDelegation();
+
+        // const AAVEBridgeABI = [
+        //     "function borrow(address maker, address borrowToken, uint256 amountBorrow) public",
+        //     "function depositAndBorrow(address maker, address depositToken, address borrowToken, uint256 amountDeposit, uint256 amountBorrow) public"
+        // ]
+
+        // const bridgeIface = new ethers.utils.Interface(AAVEBridgeABI);
+        // const dataEncoded = bridgeIface.encodeFunctionData("depositAndBorrow", [ 
+        //     "0xA4CcEF1A4f039346DD72115a958712A65BF2f155", // Maker address
+        //     "0xbd21a10f619be90d6066c941b04e340841f1f989", // Deposit USDT
+        //     "0x3c68ce8504087f89c640d02d133646d98e64ddd9", // Borrow WETH
+        //     "10000000", // Deposit 10 USDT
+        //     "5000000000000000" // Borrow 0.05 WETH
+        // ])
+
+        const dataEncoded = ethers.utils.defaultAbiCoder.encode(['address', 'address', 'uint256', 'uint256'], 
+        [
+            '0xbd21a10f619be90d6066c941b04e340841f1f989', // Deposit token
+            '0x3c68ce8504087f89c640d02d133646d98e64ddd9', // Borrow token
+            '10000000', // Deposit amount - 10 USDT
+            '5000000000000000' // Borrow amount - 0.05 WETH
+        ])
+
+        // const dataEncoded = bridgeIface.encodeFunctionData("borrow", [
+        //     "0x000000000",
+        //     "0xA4CcEF1A4f039346DD72115a958712A65BF2f155", // Maker address
+        //     "0x3c68ce8504087f89c640d02d133646d98e64ddd9", // Borrow WETH
+        //     "5000000000000000" // Borrow 0.05 WETH
+        // ])
+
+        const result = await contract.connect(signer).fillOrderRFQCallPeriphery(
             data.limitOrder,
             data.limitOrderSignature,
             takerAmount,
             makerAmount,
+            MakerConfig.aaveBridge, // Bridge address
+            dataEncoded,
             {gasLimit: 1000000}
         )
+
+        // const result = await contract.connect(signer).fillOrderRFQ(
+        //     data.limitOrder,
+        //     data.limitOrderSignature,
+        //     takerAmount,
+        //     makerAmount,
+        //     {gasLimit: 1000000}
+        // )
 
         _appendRowToBlotter(pair, blotterRow, result.hash);
         publishOrderMessage(limitOrder, 'transaction_posted', {
@@ -232,6 +274,42 @@ async function _confirmOrder(
             )
         }
     }
+}
+
+async function _approveDelegation() {
+    const _web3Provider = new ethers.providers.Web3Provider(window.ethereum)
+    const _signer = _web3Provider.getSigner(0)
+
+    // AAVE Lending pool contract - Mumbai testnet
+    const contractAAVELendingPool: Contract = new ethers.Contract(
+        "0x0f2656e068b77cda65213ef25705b728d5c73340",
+        [
+            "function approveDelegation(address delegatee, uint256 amount)"
+        ],
+        _web3Provider
+    )  
+
+    const contractERC20: Contract = new ethers.Contract(
+        "0xbd21a10f619be90d6066c941b04e340841f1f989",
+        ERC20ABI,
+        _web3Provider
+    )  
+
+    const resultApproveToken = await contractERC20
+        .connect(_signer)
+        .approve(
+            MakerConfig.aaveBridge, // Address of AAVE bridge
+            "9999999999999999999999999" // Approve amount
+        )
+    await _web3Provider.waitForTransaction(resultApproveToken.hash)
+
+    const resultApproveDelegation = await contractAAVELendingPool
+        .connect(_signer)
+        .approveDelegation(
+            MakerConfig.aaveBridge, // Address of AAVE bridge
+            "9999999999999999999999999" // Approve amount
+        )
+    await _web3Provider.waitForTransaction(resultApproveDelegation.hash)
 }
 
 function _appendRowToBlotter(pair: TokenPair,blotterRow: DealBlotterRow, hash: String, status: String = 'Confirmed') {

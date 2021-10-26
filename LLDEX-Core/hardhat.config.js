@@ -1,3 +1,6 @@
+
+require('hardhat-contract-sizer');
+
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
@@ -15,5 +18,11 @@ module.exports = {
           },
         },
       ],
+  },
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: true,
   }
 };

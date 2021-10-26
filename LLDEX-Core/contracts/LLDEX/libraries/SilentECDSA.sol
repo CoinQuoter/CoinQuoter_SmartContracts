@@ -51,7 +51,10 @@ library SilentECDSA {
             assembly {
                 let vs := mload(add(signature, 0x40))
                 r := mload(add(signature, 0x20))
-                s := and(vs, 0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+                s := and(
+                    vs,
+                    0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+                )
                 v := add(shr(255, vs), 27)
             }
         } else {
@@ -66,7 +69,12 @@ library SilentECDSA {
      * @dev Overload of {ECDSA-recover} that receives the `v`,
      * `r` and `s` signature fields separately.
      */
-    function recover(bytes32 hash, uint8 v, bytes32 r, bytes32 s) internal pure returns (address) {
+    function recover(
+        bytes32 hash,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) internal pure returns (address) {
         // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
         // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
         // the valid range for s in (281): 0 < s < secp256k1n ÷ 2 + 1, and for v in (282): v ∈ {27, 28}. Most
@@ -115,7 +123,11 @@ library SilentECDSA {
      *
      * See {recover}.
      */
-    function toTypedDataHash(bytes32 domainSeparator, bytes32 structHash) internal pure returns (bytes32) {
+    function toTypedDataHash(bytes32 domainSeparator, bytes32 structHash)
+        internal
+        pure
+        returns (bytes32)
+    {
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
     }
 }

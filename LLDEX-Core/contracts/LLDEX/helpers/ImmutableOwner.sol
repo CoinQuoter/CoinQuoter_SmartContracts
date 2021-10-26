@@ -6,7 +6,7 @@ pragma solidity ^0.8.0;
 contract ImmutableOwner {
     address public immutable immutableOwner;
 
-    modifier onlyImmutableOwner {
+    modifier onlyImmutableOwner() {
         require(msg.sender == immutableOwner, "IO: Access denied");
         _;
     }

@@ -8,27 +8,35 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
-import "./helpers/AmountCalculator.sol";
-import "./helpers/ChainlinkCalculator.sol";
 import "./helpers/ERC1155Proxy.sol";
 import "./helpers/ERC20Proxy.sol";
 import "./helpers/ERC721Proxy.sol";
+import "./interfaces/IRFQOrder.sol";
 import "./interfaces/ITradingSession.sol";
 import "./interfaces/IBalanceAccessor.sol";
+import "./interfaces/IPeripheryCallback.sol";
 import "./libraries/UncheckedAddress.sol";
 import "./libraries/ArgumentsDecoder.sol";
 import "./libraries/SilentECDSA.sol";
+
+/*
+    Abbreviations
+    TA - Taker asset
+    MA - Maker asset
+    TAD - Taker asset data
+    MAD - Maker asset data
+    SK - Session key
+*/
 
 // @title LLDEX Protocol v1
 contract LLDEXProtocol is
     ImmutableOwner(address(this)),
     EIP712("1inch Limit Order Protocol", "1"),
-    AmountCalculator,
-    ChainlinkCalculator,
     ERC1155Proxy,
     ERC20Proxy,
     ERC721Proxy,
     ReentrancyGuard,
+    IRFQOrder,
     ITradingSession,
     IBalanceAccessor
 {
@@ -37,40 +45,15 @@ contract LLDEXProtocol is
     using UncheckedAddress for address;
     using ArgumentsDecoder for bytes;
 
-    modifier makerSessionNotExpired(
-        OrderRFQ memory order,
-        bytes memory signature
-    ) {
+    modifier makerSessionNotExpired(OrderRFQ memory order, bytes memory signature) {
         // Require maker session to be valid, ie. not expired
         address maker = order.makerAssetData.decodeAddress(_FROM_INDEX);
         require(
             _sessions[maker].expirationTime > block.timestamp,
-            "LOP: EXP MAKER"
+            "LLDEX: expired maker session"
         );
 
         _;
-    }
-
-    event OrderFilledRFQ(
-        bytes32 orderHash,
-        uint256 takingAmount,
-        uint256 makingAmount
-    );
-
-    struct OrderRFQ {
-        uint256 info;
-        uint256 feeAmount;
-        address takerAsset;
-        address makerAsset;
-        address feeTokenAddress;
-        address frontendAddress;
-        bytes takerAssetData;
-        bytes makerAssetData;
-    }
-
-    struct OrderRFQAmounts {
-        uint256 takingAmount;
-        uint256 makingAmount;
     }
 
     bytes32 public constant LIMIT_ORDER_RFQ_TYPEHASH =
@@ -79,8 +62,7 @@ contract LLDEXProtocol is
         );
 
     // solhint-disable-next-line var-name-mixedcase
-    bytes4 private immutable _MAX_SELECTOR =
-        bytes4(uint32(IERC20.transferFrom.selector) + 10);
+    bytes4 private immutable _MAX_SELECTOR = bytes4(uint32(IERC20.transferFrom.selector) + 10);
 
     uint256 private constant _FROM_INDEX = 0;
     uint256 private constant _TO_INDEX = 1;
@@ -90,6 +72,7 @@ contract LLDEXProtocol is
 
     // Mapping of balance owner (either maker or frontend) to amount
     mapping(address => mapping(address => Balance)) private _balances;
+
     // Mapping of session owner to session
     mapping(address => Session) private _sessions;
 
@@ -108,17 +91,10 @@ contract LLDEXProtocol is
         return _invalidator[taker][slot];
     }
 
-    /// @notice Cancels order's quote
-    function cancelOrderRFQ(uint256 orderInfo) external {
-        _invalidator[msg.sender][uint64(orderInfo) >> 8] |= (1 <<
-            (orderInfo & 0xff));
+    function cancelOrderRFQ(uint256 orderInfo) external override {
+        _invalidator[msg.sender][uint64(orderInfo) >> 8] |= (1 << (orderInfo & 0xff));
     }
 
-    /// @notice Fills order's quote, fully or partially (whichever is possible)
-    /// @param order Order quote to fill
-    /// @param signature Signature to confirm quote ownership
-    /// @param takingAmount Taking amount
-    /// @param makingAmount Making amount
     function fillOrderRFQ(
         OrderRFQ memory order,
         bytes calldata signature,
@@ -126,24 +102,14 @@ contract LLDEXProtocol is
         uint256 makingAmount
     )
         external
+        override
         makerSessionNotExpired(order, signature)
-        returns (uint256, uint256)
+        returns (OrderRFQAmounts memory amounts)
     {
-        OrderRFQAmounts memory amounts = OrderRFQAmounts({
-            takingAmount: takingAmount,
-            makingAmount: makingAmount
-        });
+        amounts = OrderRFQAmounts({takingAmount: takingAmount, makingAmount: makingAmount});
 
-        return fillOrderRFQTo(order, amounts, signature, msg.sender);
+        fillOrderRFQTo(order, amounts, signature, msg.sender);
     }
-
-    /// @notice Fills order's quote, fully or partially (whichever is possible) and calls external contract function
-    /// @param order Order quote to fill
-    /// @param signature Signature to confirm quote ownership
-    /// @param takingAmount Taking amount
-    /// @param makingAmount Making amount
-    /// @param receiver Address of contract that will receive the call after successful validation of RFQ order and transfer from taker to maker
-    /// @param data external call data
 
     function fillOrderRFQCallPeriphery(
         OrderRFQ memory order,
@@ -154,62 +120,57 @@ contract LLDEXProtocol is
         bytes calldata data
     )
         external
+        override
         makerSessionNotExpired(order, signature)
-        returns (uint256, uint256)
+        returns (OrderRFQAmounts memory amounts, bytes memory result)
     {
-        OrderRFQAmounts memory amounts = OrderRFQAmounts({
-            takingAmount: takingAmount,
-            makingAmount: makingAmount
-        });
+        // Contract receiving external function call cannot be empty
+        require(receiver != address(0), "LLDEX: zero receiver address");
+        // And the address cannot be the address of LLDEX contract
+        require(receiver != address(this), "LLDEX: invalid receiver address");
 
-        return
-            fillOrderRFQToWithCallback(
-                order,
-                amounts,
-                signature,
-                msg.sender,
-                receiver,
-                data
-            );
-    }
+        amounts = OrderRFQAmounts({takingAmount: takingAmount, makingAmount: makingAmount});
 
-    function fillOrderRFQToWithPermit(
-        OrderRFQ memory order,
-        bytes calldata signature,
-        uint256 takingAmount,
-        uint256 makingAmount,
-        address target,
-        bytes calldata permit
-    ) external returns (uint256, uint256) {
-        _permit(permit);
-
-        OrderRFQAmounts memory amounts = OrderRFQAmounts({
-            takingAmount: takingAmount,
-            makingAmount: makingAmount
-        });
-
-        return fillOrderRFQTo(order, amounts, signature, target);
+        // Validate and fill order, transfer assets from taker to maker then call external function on receiver
+        // and finally transfer assets from maker to taker and emit OrderFilledRFQ event
+        result = fillOrderRFQToWithCallback(order, amounts, signature, receiver, data);
     }
 
     function fillOrderRFQToWithCallback(
         OrderRFQ memory order,
         OrderRFQAmounts memory amounts,
         bytes calldata signature,
-        address target,
         address receiver,
         bytes calldata data
-    ) private returns (uint256, uint256) {
+    ) private returns (bytes memory result) {
+        // Validate order, check signature, calculate hash of the order
         bytes32 orderHash = _validateRFQOrder(order, amounts, signature);
 
         // Transfer Taker => Maker
         _callTakerAssetTransferFrom(
             order.takerAsset,
             order.takerAssetData,
-            target,
+            msg.sender,
             amounts.takingAmount
         );
 
-        receiver.uncheckedFunctionCall(data, "LOP: External call failed");
+        // Address of maker that fills this RFQ order
+        address orderMakerAddress = order.makerAssetData.decodeAddress(_FROM_INDEX);
+
+        // Callback info containing tokens and amounts
+        OrderRFQCallbackInfo memory orderInfo = OrderRFQCallbackInfo({
+            takerAsset: order.takerAsset,
+            makerAsset: order.makerAsset,
+            takingAmount: amounts.takingAmount,
+            makingAmount: amounts.makingAmount
+        });
+
+        // Call provided receiver using peripery callback
+        result = IPeripheryCallback(receiver).lldexPeripheryCallback(
+            orderMakerAddress,
+            orderInfo,
+            data
+        );
 
         // Transfer Maker => Taker
         _callMakerAssetTransferFrom(
@@ -219,8 +180,6 @@ contract LLDEXProtocol is
         );
 
         _finishRFQOrder(order, amounts, orderHash);
-
-        return (amounts.takingAmount, amounts.makingAmount);
     }
 
     function fillOrderRFQTo(
@@ -258,10 +217,7 @@ contract LLDEXProtocol is
     ) internal returns (bytes32 orderHash) {
         // Check time expiration
         uint256 expiration = uint128(order.info) >> 64;
-        require(
-            expiration == 0 || block.timestamp <= expiration,
-            "LOP: order expired"
-        ); // solhint-disable-line not-rely-on-time
+        require(expiration == 0 || block.timestamp <= expiration, "LLDEX: order expired"); // solhint-disable-line not-rely-on-time
 
         {
             // Stack too deep
@@ -270,61 +226,44 @@ contract LLDEXProtocol is
             uint256 invalidatorSlot = uint64(order.info) >> 8;
             uint256 invalidatorBit = 1 << uint8(order.info);
             uint256 invalidator = _invalidator[taker][invalidatorSlot];
-            require(invalidator & invalidatorBit == 0, "LOP: already filled");
+            require(invalidator & invalidatorBit == 0, "LLDEX: already filled");
             _invalidator[taker][invalidatorSlot] = invalidator | invalidatorBit;
         }
 
         // Compute partial fill if needed
-        uint256 orderTakerAmount = order.takerAssetData.decodeUint256(
-            _AMOUNT_INDEX
-        );
-        uint256 orderMakerAmount = order.makerAssetData.decodeUint256(
-            _AMOUNT_INDEX
-        );
+        uint256 orderTakerAmount = order.takerAssetData.decodeUint256(_AMOUNT_INDEX);
+        uint256 orderMakerAmount = order.makerAssetData.decodeUint256(_AMOUNT_INDEX);
 
         if (amounts.makingAmount == 0 && amounts.takingAmount == 0) {
-            // Two zeros means whole order
+            // Fill whole order
             amounts.takingAmount = orderTakerAmount;
             amounts.makingAmount = orderMakerAmount;
         } else if (
             amounts.takingAmount != 0 &&
             (amounts.makingAmount >
-                (amounts.takingAmount *
-                    orderMakerAmount +
-                    orderTakerAmount -
-                    1) /
+                (amounts.takingAmount * orderMakerAmount + orderTakerAmount - 1) /
                     orderTakerAmount)
-        ) {
+        ) // solhint-disable-next-line no-empty-blocks
+        {
             // Partial fill with positive slippage
         } else if (amounts.makingAmount == 0) {
             amounts.makingAmount =
-                (amounts.takingAmount *
-                    orderMakerAmount +
-                    orderTakerAmount -
-                    1) /
+                (amounts.takingAmount * orderMakerAmount + orderTakerAmount - 1) /
                 orderTakerAmount;
         } else {
-            revert("LOP: one of amounts should be 0");
+            revert("LLDEX: one amount should be 0");
         }
 
         require(
             amounts.takingAmount > 0 && amounts.makingAmount > 0,
-            "LOP: can't swap 0 amount"
+            "LLDEX: cannot swap 0 amount"
         );
 
-        require(
-            amounts.takingAmount <= orderTakerAmount,
-            "LOP: taking amount exceeded"
-        );
+        require(amounts.takingAmount <= orderTakerAmount, "LLDEX: taking amount exceeded");
 
         // Validate order
         orderHash = _hash(order);
-        _validate(
-            order.takerAssetData,
-            order.makerAssetData,
-            signature,
-            orderHash
-        );
+        _validate(order.takerAssetData, order.makerAssetData, signature, orderHash);
     }
 
     function _finishRFQOrder(
@@ -342,11 +281,7 @@ contract LLDEXProtocol is
 
         _updateSessionTransactions(order.takerAssetData, order.makerAssetData);
 
-        emit OrderFilledRFQ(
-            orderHash,
-            amounts.takingAmount,
-            amounts.makingAmount
-        );
+        emit OrderFilledRFQ(orderHash, amounts.takingAmount, amounts.makingAmount);
     }
 
     function createOrUpdateSession(address sessionKey, uint256 expirationTime)
@@ -356,7 +291,7 @@ contract LLDEXProtocol is
         returns (SessionStatus)
     {
         _validateSessionKey(sessionKey);
-        require(expirationTime >= block.timestamp, "LOP: EXP");
+        require(expirationTime >= block.timestamp, "LLDEX: invalid expiration time");
 
         // Update current session if session slot exists
         if (_sessions[msg.sender].sessionKey != address(0)) {
@@ -367,11 +302,7 @@ contract LLDEXProtocol is
                 _sessions[msg.sender].sessionKey = sessionKey;
             }
 
-            emit SessionUpdated(
-                msg.sender,
-                _sessions[msg.sender].sessionKey,
-                expirationTime
-            );
+            emit SessionUpdated(msg.sender, _sessions[msg.sender].sessionKey, expirationTime);
 
             return SessionStatus.Updated;
         } else {
@@ -382,11 +313,7 @@ contract LLDEXProtocol is
                 txCount: 0
             });
 
-            emit SessionCreated(
-                msg.sender,
-                _sessions[msg.sender].sessionKey,
-                expirationTime
-            );
+            emit SessionCreated(msg.sender, _sessions[msg.sender].sessionKey, expirationTime);
         }
 
         return SessionStatus.Created;
@@ -394,10 +321,10 @@ contract LLDEXProtocol is
 
     function endSession() external override nonReentrant {
         _validateSessionKey(_sessions[msg.sender].sessionKey);
-        require(_sessions[msg.sender].expirationTime != 0, "LOP: IS");
+        require(_sessions[msg.sender].expirationTime != 0, "LLDEX: invalid session");
         require(
             _sessions[msg.sender].expirationTime >= block.timestamp,
-            "LOP: EXP"
+            "LLDEX: session expired"
         );
 
         _sessions[msg.sender].expirationTime = 0;
@@ -434,20 +361,17 @@ contract LLDEXProtocol is
     }
 
     function _permit(bytes memory permitData) private {
-        (address token, bytes memory permit) = abi.decode(
-            permitData,
-            (address, bytes)
-        );
+        (address token, bytes memory permit) = abi.decode(permitData, (address, bytes));
         token.uncheckedFunctionCall(
             abi.encodePacked(IERC20Permit.permit.selector, permit),
-            "LOP: permit failed"
+            "LLDEX: permit failed"
         );
     }
 
     function _validateSessionKey(address sessionKey) internal view {
-        require(sessionKey != address(0), "LOP: A0");
-        require(sessionKey != address(this), "LOP: AC");
-        require(sessionKey != msg.sender, "LOP: AS");
+        require(sessionKey != address(0), "LLDEX: SK is empty");
+        require(sessionKey != address(this), "LLDEX: invalid SK");
+        require(sessionKey != msg.sender, "LLDEX: invalid SK - sender");
     }
 
     function _hash(OrderRFQ memory order) private view returns (bytes32) {
@@ -475,19 +399,17 @@ contract LLDEXProtocol is
         bytes memory signature,
         bytes32 orderHash
     ) private view {
-        require(takerAssetData.length >= 100, "LOP: bad takerAssetData.length");
-        require(makerAssetData.length >= 100, "LOP: bad makerAssetData.length");
+        require(takerAssetData.length >= 100, "LLDEX: bad TAD length");
+        require(makerAssetData.length >= 100, "LLDEX: bad MAD length");
         bytes4 takerSelector = takerAssetData.decodeSelector();
         bytes4 makerSelector = makerAssetData.decodeSelector();
         require(
-            takerSelector >= IERC20.transferFrom.selector &&
-                takerSelector <= _MAX_SELECTOR,
-            "LOP: bad takerAssetData.selector"
+            takerSelector >= IERC20.transferFrom.selector && takerSelector <= _MAX_SELECTOR,
+            "LLDEX: bad TAD selector"
         );
         require(
-            makerSelector >= IERC20.transferFrom.selector &&
-                makerSelector <= _MAX_SELECTOR,
-            "LOP: bad makerAssetData.selector"
+            makerSelector >= IERC20.transferFrom.selector && makerSelector <= _MAX_SELECTOR,
+            "LLDEX: bad MAD selector"
         );
 
         address taker = address(takerAssetData.decodeAddress(_FROM_INDEX));
@@ -500,18 +422,14 @@ contract LLDEXProtocol is
                     orderHash,
                     signature
                 ),
-                "LOP: SNE bad signature "
+                "LLDEX: SNE bad signature "
             );
         } else {
             // Sesssion is expired - checking if market taker has signed the request with it's own private key (used to save gas on the market taker side)
 
             require(
-                SignatureChecker.isValidSignatureNow(
-                    taker,
-                    orderHash,
-                    signature
-                ),
-                "LOP: SE bad signature"
+                SignatureChecker.isValidSignatureNow(taker, orderHash, signature),
+                "LLDEX: SE bad signature"
             );
         }
     }
@@ -528,7 +446,7 @@ contract LLDEXProtocol is
         if (orderMakerAddress != address(0)) {
             require(
                 msg.sender == _sessions[orderMakerAddress].sessionKey,
-                "LOP: private order"
+                "LLDEX: private order"
             );
         }
 
@@ -546,19 +464,16 @@ contract LLDEXProtocol is
         require(
             takerAsset != address(0) &&
                 takerAsset != 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE,
-            "LOP: raw ETH is not supported"
+            "LLDEX: raw ETH is not supported"
         );
 
         // Transfer asset from taker to maker
         bytes memory result = takerAsset.uncheckedFunctionCall(
             takerAssetData,
-            "LOP: takerAsset.call failed"
+            "LLDEX: takerAsset.call failed"
         );
         if (result.length > 0) {
-            require(
-                abi.decode(result, (bool)),
-                "LOP: takerAsset.call bad result"
-            );
+            require(abi.decode(result, (bool)), "LLDEX: TA call bad result");
         }
     }
 
@@ -572,7 +487,7 @@ contract LLDEXProtocol is
         if (orderMakerAddress != address(0)) {
             require(
                 msg.sender == _sessions[orderMakerAddress].sessionKey,
-                "LOP: private order"
+                "LLDEX: private order"
             );
         }
 
@@ -582,19 +497,16 @@ contract LLDEXProtocol is
         require(
             makerAsset != address(0) &&
                 makerAsset != 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE,
-            "LOP: raw ETH is not supported"
+            "LLDEX: raw ETH is not supported"
         );
 
         // Transfer asset from maker to taker
         bytes memory result = makerAsset.uncheckedFunctionCall(
             makerAssetData,
-            "LOP: makerAsset.call failed"
+            "LLDEX: makerAsset.call failed"
         );
         if (result.length > 0) {
-            require(
-                abi.decode(result, (bool)),
-                "LOP: makerAsset.call bad result"
-            );
+            require(abi.decode(result, (bool)), "LLDEX: MA call bad result");
         }
     }
 
@@ -603,10 +515,10 @@ contract LLDEXProtocol is
         bytes memory makerAssetData
     ) internal returns (uint256 txCountTaker, uint256 txCountMaker) {
         address orderTakerAddress = takerAssetData.decodeAddress(_TO_INDEX);
-        require(orderTakerAddress != address(0), "LOP: OMA0");
+        require(orderTakerAddress != address(0), "LLDEX: maker address is empty");
 
         address orderMakerAddress = makerAssetData.decodeAddress(_TO_INDEX);
-        require(orderMakerAddress != address(0), "LOP: OTA0");
+        require(orderMakerAddress != address(0), "LLDEX: taker address is empty");
 
         txCountTaker = ++_sessions[orderTakerAddress].txCount;
         txCountMaker = ++_sessions[orderMakerAddress].txCount;
@@ -618,9 +530,12 @@ contract LLDEXProtocol is
         address feeToken,
         uint256 feeAmount
     ) internal {
-        require(feeToken != address(0), "LOP: 0TA");
-        require(feeToken != address(this), "LOP: ITA");
-        require(_balances[maker][feeToken].balance >= feeAmount, "LOP: BNE");
+        require(feeToken != address(0), "LLDEX: fee token empty");
+        require(feeToken != address(this), "LLDEX: invalid fee token address");
+        require(
+            _balances[maker][feeToken].balance >= feeAmount,
+            "LLDEX: insufficient maker fee"
+        );
 
         _balances[maker][feeToken].balance -= feeAmount;
         _balances[frontend][feeToken].balance += feeAmount;
@@ -632,9 +547,9 @@ contract LLDEXProtocol is
         nonReentrant
         returns (uint256)
     {
-        require(token != address(0), "LOP: 0TA");
-        require(token != address(this), "LOP: ITA");
-        require(amount > 0, "LOP: 0A");
+        require(token != address(0), "LLDEX: empty fee token");
+        require(token != address(this), "LLDEX: invalid fee token");
+        require(amount > 0, "LLDEX: amount is 0");
 
         IERC20 tokenERC20 = IERC20(token);
         tokenERC20.safeTransferFrom(msg.sender, address(this), amount);
@@ -649,10 +564,10 @@ contract LLDEXProtocol is
         nonReentrant
         returns (uint256)
     {
-        require(token != address(0), "LOP: 0TA");
-        require(token != address(this), "LOP: ITA");
-        require(amount > 0, "LOP: 0A");
-        require(_balances[msg.sender][token].balance >= amount, "LOP: BNE");
+        require(token != address(0), "LLDEX: empty fee token");
+        require(token != address(this), "LLDEX: invalid fee token");
+        require(amount > 0, "LLDEX: amount is 0");
+        require(_balances[msg.sender][token].balance >= amount, "LLDEX: insufficient balance");
 
         IERC20 tokenERC20 = IERC20(token);
         tokenERC20.safeTransfer(msg.sender, amount);

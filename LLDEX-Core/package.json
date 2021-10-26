@@ -17,10 +17,26 @@
   "dependencies": {
     "@openzeppelin/contracts": "^4.3.2",
     "@openzeppelin/contracts_v42": "npm:@openzeppelin/contracts@^4.2.0",
-    "hardhat": "^2.6.0"
+    "hardhat": "^2.6.0",
+    "hardhat-gas-reporter": "^1.0.4"
   },
   "scripts": {
+    "solhint": "./node_modules/.bin/solhint -f table contracts/LLDEX/**/*.sol contracts/LLDEX/*.sol",
+    "prettier:solidity": "./node_modules/.bin/prettier --write contracts/LLDEX/**/*.sol contracts/LLDEX/*.sol",
     "compile": "hardhat compile",
     "test": "hardhat test"
+  },
+  "devDependencies": {
+    "hardhat-contract-sizer": "^2.1.1",
+    "husky": "^7.0.4",
+    "prettier": "^2.4.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.18",
+    "solhint": "^3.3.6",
+    "solhint-plugin-prettier": "^0.0.5"
+  },
+  "husky": {
+    "hooks": {
+      "pre-push": "npm run prettier:solidity"
+    }
   }
 }
