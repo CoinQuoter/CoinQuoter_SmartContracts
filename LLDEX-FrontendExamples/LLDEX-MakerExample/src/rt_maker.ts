@@ -183,7 +183,7 @@ async function _confirmOrder(
             return;
         }
 
-        //await _approveDelegation();
+        await _approveDelegationWithdraw();
 
         // const AAVEBridgeABI = [
         //     "function borrow(address maker, address borrowToken, uint256 amountBorrow) public",
@@ -199,12 +199,15 @@ async function _confirmOrder(
         //     "5000000000000000" // Borrow 0.05 WETH
         // ])
 
-        const dataEncoded = ethers.utils.defaultAbiCoder.encode(['address', 'address', 'uint256', 'uint256'], 
+        //0xf8744c0bd8c7adea522d6dde2298b17284a79d1b
+
+        const dataEncoded = ethers.utils.defaultAbiCoder.encode([ 'address', 'address', 'address', 'uint256', 'uint256'], 
         [
-            '0xbd21a10f619be90d6066c941b04e340841f1f989', // Deposit token
-            '0x3c68ce8504087f89c640d02d133646d98e64ddd9', // Borrow token
-            '10000000', // Deposit amount - 10 USDT
-            '5000000000000000' // Borrow amount - 0.05 WETH
+            '0x3c68ce8504087f89c640d02d133646d98e64ddd9', 
+            '0xbd21a10f619be90d6066c941b04e340841f1f989', 
+            '0xf8744c0bd8c7adea522d6dde2298b17284a79d1b',
+            '5000000000000000', 
+            '10000000'
         ])
 
         // const dataEncoded = bridgeIface.encodeFunctionData("borrow", [
@@ -256,6 +259,8 @@ async function _confirmOrder(
 
         txSuccess(limitOrder, result.hash)
     } catch (err) {
+        console.error(err)
+
         if (err?.transaction?.hash) {
             _appendRowToBlotter(pair, blotterRow, err.transaction.hash);
 
@@ -274,6 +279,56 @@ async function _confirmOrder(
             )
         }
     }
+}
+
+async function _approveDelegationWithdraw() {
+    const _web3Provider = new ethers.providers.Web3Provider(window.ethereum)
+    const _signer = _web3Provider.getSigner(0)
+
+    // AAVE Lending pool contract - Mumbai testnet
+    const contractAAVELendingPool: Contract = new ethers.Contract(
+        "0x0f2656e068b77cda65213ef25705b728d5c73340",
+        [
+            "function approveDelegation(address delegatee, uint256 amount)"
+        ],
+        _web3Provider
+    )
+
+    const contractERC20aTokenUSDT: Contract = new ethers.Contract(
+        "0xf8744c0bd8c7adea522d6dde2298b17284a79d1b", // aToken USDT
+        ERC20ABI,
+        _web3Provider
+    )  
+
+    const contractERC20USDT: Contract = new ethers.Contract(
+        "0x3c68ce8504087f89c640d02d133646d98e64ddd9",
+        ERC20ABI,
+        _web3Provider
+    ) 
+
+    const resultApproveTokenUSDTaToken = await contractERC20aTokenUSDT
+        .connect(_signer)
+        .approve(
+            MakerConfig.aaveBridge, // Address of AAVE bridge
+            "9999999999999999999999999" // Approve amount
+        )
+    await _web3Provider.waitForTransaction(resultApproveTokenUSDTaToken.hash)
+
+    const resultApproveTokenUSDT = await contractERC20USDT
+        .connect(_signer)
+        .approve(
+            MakerConfig.aaveBridge, // Address of AAVE bridge
+            "9999999999999999999999999" // Approve amount
+        )
+    await _web3Provider.waitForTransaction(resultApproveTokenUSDT.hash)
+
+    const resultApproveDelegation = await contractAAVELendingPool
+        .connect(_signer)
+        .approveDelegation(
+            MakerConfig.aaveBridge, // Address of AAVE bridge
+            "9999999999999999999999999" // Approve amount
+        )
+    await _web3Provider.waitForTransaction(resultApproveDelegation.hash)
 }
 
 async function _approveDelegation() {

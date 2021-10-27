@@ -360,14 +360,6 @@ contract LLDEXProtocol is
         );
     }
 
-    function _permit(bytes memory permitData) private {
-        (address token, bytes memory permit) = abi.decode(permitData, (address, bytes));
-        token.uncheckedFunctionCall(
-            abi.encodePacked(IERC20Permit.permit.selector, permit),
-            "LLDEX: permit failed"
-        );
-    }
-
     function _validateSessionKey(address sessionKey) internal view {
         require(sessionKey != address(0), "LLDEX: SK is empty");
         require(sessionKey != address(this), "LLDEX: invalid SK");

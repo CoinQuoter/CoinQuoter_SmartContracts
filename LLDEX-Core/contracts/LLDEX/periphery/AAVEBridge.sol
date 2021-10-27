@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import ".././interfaces/IPeripheryCallback.sol";
 import "./interfaces/ILendingPool.sol";
+import "./interfaces/IProtocolDataProvider.sol";
 import "./libraries/DataTypes.sol";
 
 contract AAVEBridge is ReentrancyGuard, IPeripheryCallback {
@@ -16,8 +17,13 @@ contract AAVEBridge is ReentrancyGuard, IPeripheryCallback {
     // No referral code provided
     uint16 private constant NO_REFERRAL = 0;
 
+    bytes32 private constant DATA_PROVIDER_ID = "0x1";
+
     // AAVE Lending pool interface
     ILendingPool private lendingPool;
+
+    // AAVE data provider
+    IProtocolDataProvider private dataProvider;
 
     // Address of LLDEXProtcol contract
     address private lldexAddress;
@@ -37,8 +43,19 @@ contract AAVEBridge is ReentrancyGuard, IPeripheryCallback {
         uint256 amountBorrow;
     }
 
+    struct AAVECallbackDataRepay {
+        address repayToken;
+        address withdrawToken;
+        address withdrawaToken;
+        uint256 amountRepay;
+        uint256 amountWithdraw;
+    }
+
     constructor(address _poolAddress, address _lldexAddress) {
         lendingPool = ILendingPool(_poolAddress);
+        dataProvider = IProtocolDataProvider(
+            lendingPool.getAddressesProvider().getAddress(DATA_PROVIDER_ID)
+        );
         lldexAddress = _lldexAddress;
     }
 
@@ -48,12 +65,38 @@ contract AAVEBridge is ReentrancyGuard, IPeripheryCallback {
         IRFQOrder.OrderRFQCallbackInfo calldata info,
         bytes memory payload
     ) external override verifyCallback returns (bytes memory result) {
-        AAVECallbackData memory decodedPayload = abi.decode(payload, (AAVECallbackData));
+        // uint8 _selector = abi.decode(payload, (uint8));
 
-        require(decodedPayload.borrowToken != address(0), "AAVEBridge: invalid borrow tkn");
-        require(decodedPayload.depositToken != address(0), "AAVEBridge: invalid deposit tkn");
+        // if (_selector == 1) {
+        //     AAVECallbackData memory decodedPayload = abi.decode(
+        //         _clearSelector(payload),
+        //         (AAVECallbackData)
+        //     );
 
-        depositAndBorrow(maker, decodedPayload);
+        //     require(decodedPayload.borrowToken != address(0), "AAVEBridge: invalid borrow");
+        //     require(decodedPayload.depositToken != address(0), "AAVEBridge: invalid deposit");
+
+        //     depositAndBorrow(maker, decodedPayload);
+        // } else if (_selector == 2) {
+        AAVECallbackDataRepay memory decodedPayload = abi.decode(
+            payload,
+            (AAVECallbackDataRepay)
+        );
+
+        require(decodedPayload.withdrawToken != address(0), "AAVEBridge: invalid withdraw");
+        require(decodedPayload.repayToken != address(0), "AAVEBridge: invalid repay");
+
+        repayAndWithdraw(maker, decodedPayload);
+        // } else {
+        //     revert("AAVEBridge: Invalid selector");
+        // }
+    }
+
+    function _clearSelector(bytes memory data) internal pure returns (bytes memory result) {
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            result := mload(add(data, 0x21))
+        }
     }
 
     function depositAndBorrow(address maker, AAVECallbackData memory data)
@@ -79,5 +122,56 @@ contract AAVEBridge is ReentrancyGuard, IPeripheryCallback {
 
         // Transfer @borrowToken from bridge back to to maker
         IERC20(data.borrowToken).safeTransfer(maker, data.amountBorrow);
+    }
+
+    function repayAndWithdraw(address maker, AAVECallbackDataRepay memory data)
+        internal
+        nonReentrant
+    {
+        // Transfer @repayToken from maker to AAVE bridge (maker must approve bridge to use his tokens)
+        IERC20(data.repayToken).safeTransferFrom(maker, address(this), data.amountRepay);
+        // Approve AAVE Lending pool to use up to @amountRepay of bridge @depositToken
+        IERC20(data.repayToken).approve(address(lendingPool), data.amountRepay);
+
+        // Repay @amountDeposit of @repayToken to AAVE lending pool
+        lendingPool.repay(
+            data.repayToken,
+            data.amountRepay,
+            uint256(DataTypes.InterestRateMode.VARIABLE),
+            maker
+        );
+
+        // Withdraw aTokens from maker
+        IERC20(data.withdrawaToken).safeTransferFrom(
+            maker,
+            address(this),
+            data.amountWithdraw
+        );
+
+        // And withdraw @amountWithdraw of @withdrawToken from AAVE pool
+        lendingPool.withdraw(data.withdrawToken, data.amountWithdraw, maker);
+
+        // // Transfer @withdrawToken from bridge back to to maker
+        // IERC20(data.withdrawToken).safeTransfer(maker, data.amountWithdraw);
+    }
+
+    function _getaToken(address asset) internal view returns (address aTokenAddress) {
+        (aTokenAddress, , ) = dataProvider.getReserveTokensAddresses(asset);
+    }
+
+    function _getStableDebtToken(address asset)
+        internal
+        view
+        returns (address stableDebtTokenAddress)
+    {
+        (, stableDebtTokenAddress, ) = dataProvider.getReserveTokensAddresses(asset);
+    }
+
+    function _getVariableDebtToken(address asset)
+        internal
+        view
+        returns (address variableDebtTokenAddress)
+    {
+        (, , variableDebtTokenAddress) = dataProvider.getReserveTokensAddresses(asset);
     }
 }

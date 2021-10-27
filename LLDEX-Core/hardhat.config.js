@@ -1,5 +1,8 @@
 
 require('hardhat-contract-sizer');
+require('solidity-coverage')
+require('hardhat-gas-reporter');
+require('@nomiclabs/hardhat-truffle5');
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
@@ -13,7 +16,7 @@ module.exports = {
           settings: {
             optimizer: {
               enabled: true,
-              runs: 10
+              runs: 10000
             }
           },
         },
@@ -24,5 +27,9 @@ module.exports = {
     disambiguatePaths: false,
     runOnCompile: true,
     strict: true,
-  }
+  },
+  gasReporter: {
+      enable: true,
+      currency: 'USD',
+  },
 };
