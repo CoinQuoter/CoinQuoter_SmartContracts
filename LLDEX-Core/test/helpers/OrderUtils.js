@@ -1,4 +1,5 @@
 const { EIP712Domain } = require('./eip712');
+const { BN } = require('@openzeppelin/test-helpers');
 
 const OrderRFQ = [
     { name: 'info', type: 'uint256' },
@@ -7,8 +8,8 @@ const OrderRFQ = [
     { name: 'makerAsset', type: 'address' },
     { name: 'feeTokenAddress', type: 'address' },
     { name: 'frontendAddress', type: 'address' },
-    { name: 'takerAssetData', type: 'uint256' },
-    { name: 'makerAssetData', type: 'uint256' },
+    { name: 'takerAssetData', type: 'bytes' },
+    { name: 'makerAssetData', type: 'bytes' },
 ];
 
 const name = '1inch Limit Order Protocol';
@@ -23,8 +24,18 @@ function buildOrderRFQData (chainId, verifyingContract, order) {
     };
 }
 
+function generateRFQOrderInfo(
+    id,
+    expiresInTimestamp
+) {
+    return ((BigInt(expiresInTimestamp) << BigInt(64)) | BigInt(id)).toString(
+        10
+    );
+}
+
 module.exports = {
     buildOrderRFQData,
+    generateRFQOrderInfo,
     name,
     version,
 };

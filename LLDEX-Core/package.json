@@ -23,13 +23,14 @@
     "solhint": "./node_modules/.bin/solhint -f table contracts/LLDEX/**/*.sol contracts/LLDEX/*.sol contracts/LLDEX/**/**/*.sol",
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/LLDEX/**/*.sol contracts/LLDEX/*.sol contracts/LLDEX/**/**/*.sol",
     "compile": "hardhat compile",
-    "test": "hardhat test"
+    "test": "hardhat test",
+    "coverage": "hardhat coverage"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-truffle5": "^2.0.2",
     "@nomiclabs/hardhat-web3": "^2.0.0",
     "@openzeppelin/test-helpers": "^0.5.15",
-    "@types/eth-sig-util": "^2.1.1",
+    "chai-bn": "^0.3.0",
     "hardhat": "^2.6.4",
     "hardhat-contract-sizer": "^2.1.1",
     "hardhat-gas-reporter": "^1.0.4",
@@ -40,7 +41,8 @@
     "solhint": "^3.3.6",
     "solhint-plugin-prettier": "^0.0.5",
     "solidity-coverage": "^0.8.0-beta.0",
-    "web3": "^1.6.0"
+    "web3": "^1.6.0",
+    "eth-sig-util": "^3.0.1"
   },
   "husky": {
     "hooks": {

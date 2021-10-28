@@ -4,7 +4,7 @@ const { name, version } = require('./helpers/orderUtils');
 const TokenMock = artifacts.require('TokenMock');
 const LLDEXProtocol = artifacts.require('LLDEXProtocol');
 
-describe('LLDEXProtocol', async function () {
+describe('LLDEXProtocol-EIP712', async function () {
     beforeEach(async function () {
         this.token = await TokenMock.new('-', '-');
         this.swap = await LLDEXProtocol.new();

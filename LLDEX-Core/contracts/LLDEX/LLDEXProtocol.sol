@@ -17,7 +17,6 @@ import "./interfaces/IBalanceAccessor.sol";
 import "./interfaces/IPeripheryCallback.sol";
 import "./libraries/UncheckedAddress.sol";
 import "./libraries/ArgumentsDecoder.sol";
-import "./libraries/SilentECDSA.sol";
 
 /*
     Abbreviations
@@ -346,7 +345,7 @@ contract LLDEXProtocol is
         view
         override
         returns (
-            address taker,
+            address creator,
             address sessionKey,
             uint256 expirationTime,
             uint256 txCount
@@ -414,7 +413,7 @@ contract LLDEXProtocol is
                     orderHash,
                     signature
                 ),
-                "LLDEX: SNE bad signature "
+                "LLDEX: SNE bad signature"
             );
         } else {
             // Sesssion is expired - checking if market taker has signed the request with it's own private key (used to save gas on the market taker side)

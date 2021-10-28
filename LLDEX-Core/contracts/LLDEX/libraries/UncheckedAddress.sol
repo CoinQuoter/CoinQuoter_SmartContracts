@@ -26,19 +26,6 @@ library UncheckedAddress {
         return _verifyCallResult(success, returndata, errorMessage);
     }
 
-    function uncheckedFunctionStaticCall(
-        address target,
-        bytes memory data,
-        string memory errorMessage
-    ) internal view returns (bytes memory) {
-        // Check turned off:
-        // require(isContract(target), "Address: static call to non-contract");
-
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool success, bytes memory returndata) = target.staticcall(data);
-        return _verifyCallResult(success, returndata, errorMessage);
-    }
-
     //noinspection NoReturn
     function _verifyCallResult(
         bool success,

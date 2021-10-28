@@ -1,7 +1,5 @@
 const { BN, ether } = require('@openzeppelin/test-helpers');
 
-const addr1PrivateKey = 'ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-
 function price (val) {
     return ether(val).toString();
 }
@@ -28,7 +26,6 @@ function cutLastArg (data, padding=0) {
 }
 
 module.exports = {
-    addr1PrivateKey,
     price,
     toBN,
     cutSelector,

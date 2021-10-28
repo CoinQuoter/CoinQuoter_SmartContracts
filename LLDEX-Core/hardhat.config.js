@@ -22,14 +22,19 @@ module.exports = {
         },
       ],
   },
+  networks: {
+    hardhat: {
+      initialBaseFeePerGas: 0
+    }
+  },
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
-    runOnCompile: true,
+    runOnCompile: false,
     strict: true,
   },
   gasReporter: {
-      enable: true,
+      enable: false,
       currency: 'USD',
   },
 };
