@@ -3,6 +3,7 @@ module.exports = {
         allowUnlimitedContractSize: true
     },
     skipFiles: [
-        'mocks'
+        'mocks',
+        'LLDEX/periphery/AAVEBridge.sol'
     ]
 };

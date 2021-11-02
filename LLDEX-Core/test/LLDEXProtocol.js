@@ -1,8 +1,10 @@
-const { expectRevert, expectEvent, BN, time } = require('@openzeppelin/test-helpers');
+const { expectRevert, expectEvent } = require('@openzeppelin/test-helpers');
 const { expect } = require('chai');
+const { ethers } = require('ethers');
 
 const ethSigUtil = require('eth-sig-util');
 const TokenMock = artifacts.require('TokenMock');
+const CallbackMock = artifacts.require('CallbackMock');
 const LLDEXProtocol = artifacts.require('LLDEXProtocol');
 
 const { buildOrderRFQData, generateRFQOrderInfo } = require('./helpers/orderUtils');
@@ -107,6 +109,21 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
             expect(makerExpirationTimestamp).to.be.bignumber.equal(expireInForwarded.toString());
         });
 
+        it('createOrUpdateSession should update session key and emit event with updated session key', async function () {
+            await createSessions(this.lldex);
+
+            const newSessionKey = '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65';
+            const receipt = await this.lldex.createOrUpdateSession(newSessionKey, expireInTimestamp + 3600, { from: takerWallet });
+            const sessionKey = (await this.lldex.session(takerWallet)).sessionKey;
+
+            expect(sessionKey).to.be.eq(newSessionKey);
+            expectEvent(receipt, 'SessionUpdated', { 
+                sender: takerWallet,
+                sessionKey: newSessionKey,
+                expirationTime: (expireInTimestamp + 3600).toString()
+            });
+        });
+
         it('createOrUpdateSession should revert if session timestamp is below block.timestamp', async function () {
             expectRevert(
                 this.lldex.createOrUpdateSession(takerSessionWallet, blockchainTimestamp - 3600, { from: takerWallet }),
@@ -159,7 +176,7 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
     });
 
     describe('Session system - sessionExpirationTime, session', async function() {
-                it('sessionExpirationTime should return session expiration time', async function () {
+        it('sessionExpirationTime should return session expiration time', async function () {
             await createSessions(this.lldex);
 
             expect(await this.lldex.sessionExpirationTime(takerWallet)).to.be.bignumber.equal(expireInTimestamp.toString());
@@ -322,6 +339,72 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
             );
         });
 
+        it('should revert if signed order transfer amount is 0', async function () {
+            await createSessions(this.lldex);
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: '0',
+                takerAsset: this.dai.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.fee.address,
+                frontendAddress: takerWallet,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 0).encodeABI(),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 5).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            await expectRevert(
+                this.lldex.fillOrderRFQ(order, signature, 1, 0),
+                'LLDEX: one of order amounts is 0',
+            );
+        });
+
+        it('should revert if takerAssetData selector is invalid', async function () {
+            await createSessions(this.lldex);
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: 0,
+                takerAsset: this.lldex.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.weth.address,
+                frontendAddress: zeroAddress,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 5).encodeABI(),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 5).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            await expectRevert(
+                this.lldex.fillOrderRFQ(order, signature, 5, 0, { from: makerSessionWallet }),
+                'LLDEX: takerAsset.call failed'
+            );
+        });
+
+        it('should revert if makerAssetData selector is invalid', async function () {
+            await createSessions(this.lldex);
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: 0,
+                takerAsset: this.dai.address,
+                makerAsset: this.lldex.address,
+                feeTokenAddress: this.weth.address,
+                frontendAddress: zeroAddress,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 5).encodeABI(),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 5).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            await expectRevert(
+                this.lldex.fillOrderRFQ(order, signature, 5, 0, { from: makerSessionWallet }),
+                'LLDEX: makerAsset.call failed'
+            );
+        });
+
         it('should revert filling RFQ order when takingAmount execeeds order taking amount', async function () {
             await createSessions(this.lldex);
 
@@ -417,6 +500,214 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
             expect(resultBeforeFillMaker).to.be.bignumber.equal('0');
             expect(resultAfterFillTaker).to.be.bignumber.equal('1');
             expect(resultAfterFillMaker).to.be.bignumber.equal('1');
+        });
+
+        it('should fill whole OrderRFQ and withdraw fee from maker', async function () {
+            await createSessions(this.lldex);
+            await this.lldex.depositToken(this.fee.address, 15, { from: makerWallet });
+            const balanceBefore = await this.lldex.balance(this.fee.address, { from: makerWallet });
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: '5',
+                takerAsset: this.dai.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.fee.address,
+                frontendAddress: takerWallet,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 15).encodeABI(),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 15).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            await this.lldex.fillOrderRFQ(order, signature, 15, 0, { from: makerSessionWallet });
+            const balanceAfter = await this.lldex.balance(this.fee.address, { from: makerWallet });
+
+            expect(balanceBefore).to.be.bignumber.equal('15');
+            expect(balanceAfter).to.be.bignumber.equal('10');
+        });
+
+        it('should revert if fee amount is greater than maker balance', async function () {
+            await createSessions(this.lldex);
+            await this.lldex.depositToken(this.fee.address, 15, { from: makerWallet });
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: '25',
+                takerAsset: this.dai.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.fee.address,
+                frontendAddress: takerWallet,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 15).encodeABI(),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 15).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            expectRevert(this.lldex.fillOrderRFQ(order, signature, 15, 0, { from: makerSessionWallet }), 'LLDEX: insufficient maker fee');
+        });
+
+        it('should bubble up revert reason on uncheckedFunctionCall', async function () {
+            await createSessions(this.lldex);
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: 0,
+                takerAsset: this.dai.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.weth.address,
+                frontendAddress: zeroAddress,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 15).encodeABI(),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 1500000000).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            expectRevert(
+                this.lldex.fillOrderRFQ(order, signature, 15, 0, { from: makerSessionWallet }),
+                'ERC20: transfer amount exceeds balance'
+            );
+        });
+
+        it('should revert if invalid function selector is provided - takerAssetData', async function () {
+            await createSessions(this.lldex);
+
+            const iface = new ethers.utils.Interface(['function foo(address bar1, address bar2, uint256 bar3) public']);
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: 0,
+                takerAsset: this.dai.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.weth.address,
+                frontendAddress: zeroAddress,
+                takerAssetData: iface.encodeFunctionData('foo', [takerWallet, makerWallet, 10]),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 15).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            expectRevert(
+                this.lldex.fillOrderRFQ(order, signature, 10, 0, { from: makerSessionWallet }),
+                'LLDEX: bad TAD selector'
+            );
+        });
+
+        it('should revert if invalid function selector is provided - makerAssetData', async function () {
+            await createSessions(this.lldex);
+
+            const iface = new ethers.utils.Interface(['function foo(address bar1, address bar2, uint256 bar3) public']);
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: 0,
+                takerAsset: this.dai.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.weth.address,
+                frontendAddress: zeroAddress,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 15).encodeABI(),
+                makerAssetData: iface.encodeFunctionData('foo', [makerWallet, takerWallet, 10]),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            expectRevert(
+                this.lldex.fillOrderRFQ(order, signature, 10, 0, { from: makerSessionWallet }),
+                'LLDEX: bad MAD selector'
+            );
+        });
+    });
+
+    describe('OrderRFQ - execution fillOrderRFQPeriphery', async function () {
+        it('should fill whole order and call external contract', async function () {
+            await createSessions(this.lldex);
+            const order = buildOrderRFQ(generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()), this.dai, this.weth, 15, 15);
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+            const callbackMock = await CallbackMock.new();
+
+            const mockAddress = '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65';
+            const dataABIEncoded = ethers.utils.defaultAbiCoder.encode([ 'address', 'uint256'], 
+            [
+                mockAddress, 
+                '15'
+            ])
+
+            const makerDai = await this.dai.balanceOf(makerWallet);
+            const takerDai = await this.dai.balanceOf(takerWallet);
+            const makerWeth = await this.weth.balanceOf(makerWallet);
+            const takerWeth = await this.weth.balanceOf(takerWallet);
+
+            const receipt = await this.lldex.fillOrderRFQCallPeriphery(
+                order, 
+                signature, 
+                15, 
+                0, 
+                callbackMock.address, 
+                dataABIEncoded, 
+                { from: makerSessionWallet }
+            );
+
+            expect(await this.dai.balanceOf(takerWallet)).to.be.bignumber.equal(takerDai.subn(15));
+            expect(await this.dai.balanceOf(makerWallet)).to.be.bignumber.equal(makerDai.addn(15));
+            expect(await this.weth.balanceOf(takerWallet)).to.be.bignumber.equal(takerWeth.addn(15));
+            expect(await this.weth.balanceOf(makerWallet)).to.be.bignumber.equal(makerWeth.subn(15));
+            expectEvent.inTransaction(receipt.tx, CallbackMock, 'MockCallbackReceived', { 
+                mockAddress: mockAddress,
+                mockData: '16',
+            });
+        });
+
+        it('should revert if external contract address is empty', async function () {
+            await createSessions(this.lldex);
+            const order = buildOrderRFQ(generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()), this.dai, this.weth, 15, 15);
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            const mockAddress = '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65';
+            const dataABIEncoded = ethers.utils.defaultAbiCoder.encode([ 'address', 'uint256'], 
+            [
+                mockAddress, 
+                '15'
+            ])
+
+            await expectRevert(
+                this.lldex.fillOrderRFQCallPeriphery(
+                    order, 
+                    signature, 
+                    15, 
+                    0, 
+                    zeroAddress, 
+                    dataABIEncoded, 
+                    { from: makerSessionWallet }
+                ),
+                'LLDEX: zero receiver address',
+            );
+        });
+
+        it('should revert if external contract address is LLDEXProtocolAddress', async function () {
+            await createSessions(this.lldex);
+            const order = buildOrderRFQ(generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()), this.dai, this.weth, 15, 15);
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            const mockAddress = '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65';
+            const dataABIEncoded = ethers.utils.defaultAbiCoder.encode([ 'address', 'uint256'], 
+            [
+                mockAddress, 
+                '15'
+            ])
+
+            await expectRevert(
+                this.lldex.fillOrderRFQCallPeriphery(
+                    order, 
+                    signature, 
+                    15, 
+                    0, 
+                    this.lldex.address, 
+                    dataABIEncoded, 
+                    { from: makerSessionWallet }
+                ),
+                'LLDEX: invalid receiver address',
+            );
         });
     });
 
@@ -614,6 +905,37 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
                 this.lldex.withdrawToken(this.fee.address, 5),
                 'LLDEX: insufficient balance'
             )
+        });
+    });
+
+    describe('Proxies', async function () {
+        it('ERC721Proxy should work', async function () {
+            await createSessions(this.lldex);
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: 0,
+                takerAsset: this.lldex.address,
+                makerAsset: this.lldex.address,
+                feeTokenAddress: this.weth.address,
+                frontendAddress: zeroAddress,
+                takerAssetData: this.lldex.contract.methods.func_602HzuS(takerWallet, makerWallet, 15, this.dai.address).encodeABI(),
+                makerAssetData: this.lldex.contract.methods.func_602HzuS(makerWallet, takerWallet, 15, this.weth.address).encodeABI()
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            const makerDai = await this.dai.balanceOf(makerWallet);
+            const takerDai = await this.dai.balanceOf(takerWallet);
+            const makerWeth = await this.weth.balanceOf(makerWallet);
+            const takerWeth = await this.weth.balanceOf(takerWallet);
+            
+            await this.lldex.fillOrderRFQ(order, signature, 15, 0, { from: makerSessionWallet });
+
+            expect(await this.dai.balanceOf(takerWallet)).to.be.bignumber.equal(takerDai.subn(15));
+            expect(await this.dai.balanceOf(makerWallet)).to.be.bignumber.equal(makerDai.addn(15));
+            expect(await this.weth.balanceOf(takerWallet)).to.be.bignumber.equal(takerWeth.addn(15));
+            expect(await this.weth.balanceOf(makerWallet)).to.be.bignumber.equal(makerWeth.subn(15));
         });
     });
 });

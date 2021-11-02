@@ -5,11 +5,12 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
 import "./helpers/ERC1155Proxy.sol";
-import "./helpers/ERC20Proxy.sol";
 import "./helpers/ERC721Proxy.sol";
 import "./interfaces/IRFQOrder.sol";
 import "./interfaces/ITradingSession.sol";
@@ -32,7 +33,6 @@ contract LLDEXProtocol is
     ImmutableOwner(address(this)),
     EIP712("1inch Limit Order Protocol", "1"),
     ERC1155Proxy,
-    ERC20Proxy,
     ERC721Proxy,
     ReentrancyGuard,
     IRFQOrder,
@@ -233,6 +233,11 @@ contract LLDEXProtocol is
         uint256 orderTakerAmount = order.takerAssetData.decodeUint256(_AMOUNT_INDEX);
         uint256 orderMakerAmount = order.makerAssetData.decodeUint256(_AMOUNT_INDEX);
 
+        require(
+            orderTakerAmount > 0 && orderMakerAmount > 0,
+            "LLDEX: one of order amounts is 0"
+        );
+
         if (amounts.makingAmount == 0 && amounts.takingAmount == 0) {
             // Fill whole order
             amounts.takingAmount = orderTakerAmount;
@@ -272,7 +277,7 @@ contract LLDEXProtocol is
     ) internal {
         // Withdraw fee
         _withdrawFee(
-            order.makerAssetData.decodeAddress(_TO_INDEX),
+            order.makerAssetData.decodeAddress(_FROM_INDEX),
             order.frontendAddress,
             order.feeTokenAddress,
             order.feeAmount
