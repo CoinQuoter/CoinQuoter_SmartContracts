@@ -24,15 +24,15 @@ interface IBalanceAccessor {
     }
 
     /**
-     * @notice Deposits given token of frontend to the LOP contract and stores the balance information
-     * @param token address of token to deposit, depositing account must give an allowance to the LOP contract for given @amount
+     * @notice Deposits given token of frontend to the LLDEX contract and stores the balance information
+     * @param token address of token to deposit, depositing account must give an allowance to the LLDEX contract for given @amount
      * @param amount amount of tokens to deposit
      * @return balance after depositing the tokens
      */
     function depositToken(address token, uint256 amount) external returns (uint256);
 
     /**
-     * @notice Withdraws given token of frontend from the LOP contract
+     * @notice Withdraws given token of frontend from the LLDEX contract
      * @param token address of token to withdraw
      * @param amount amount of tokens to withdraw
      * @return balance after withdrawing the tokens
@@ -40,8 +40,8 @@ interface IBalanceAccessor {
     function withdrawToken(address token, uint256 amount) external returns (uint256);
 
     /**
-     * @notice Returns balance of token available for use in LOP
-     * @param token address of token to withdraw
+     * @notice Returns balance of token available for use in LLDEX
+     * @param token address of token to check balance of
      * @return balance of given token
      */
     function balance(address token) external returns (uint256);

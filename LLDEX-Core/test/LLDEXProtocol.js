@@ -150,7 +150,7 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
                 this.lldex.createOrUpdateSession(takerWallet, blockchainTimestamp - 3600, { from: takerWallet }),
                 'LLDEX: invalid SK - sender'
             );
-        });
+        }); 
 
         it('createOrUpdateSession should emit SessionCreated on session creation', async function () {
             const receipt = await this.lldex.createOrUpdateSession(takerSessionWallet, expireInTimestamp, { from: takerWallet });
