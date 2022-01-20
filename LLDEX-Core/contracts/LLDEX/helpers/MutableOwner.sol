@@ -6,6 +6,11 @@ pragma solidity ^0.8.0;
 contract MutableOwner {
     address private _mutableOwner;
 
+    event OwnershipTransfered(
+        address from,
+        address to
+    );
+
     modifier onlyOwner() {
         require(msg.sender == _mutableOwner, "MO: Access denied");
         _;
@@ -16,7 +21,10 @@ contract MutableOwner {
     }
     
     function _mutateOwner(address owner) internal onlyOwner {
+        address previousOwner = _mutableOwner;
         _mutableOwner = owner;
+
+        emit OwnershipTransfered(previousOwner, owner);
     }
 
     function mutableOwner() public view returns(address) {

@@ -7,7 +7,7 @@ const LLDEXProtocol = artifacts.require('LLDEXProtocol');
 describe('LLDEXProtocol-EIP712', async function () {
     beforeEach(async function () {
         this.token = await TokenMock.new('-', '-');
-        this.swap = await LLDEXProtocol.new();
+        this.swap = await LLDEXProtocol.new(25);
 
         // We get the chain id from the contract because Ganache (used for coverage) does not return the same chain id
         // from within the EVM as from the JSON RPC interface.

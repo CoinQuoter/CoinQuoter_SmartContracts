@@ -10,7 +10,7 @@ const LLDEXProtocol = artifacts.require('LLDEXProtocol');
 const { buildOrderRFQData, generateRFQOrderInfo } = require('./helpers/orderUtils');
 const { toBN } = require('./helpers/Utils.js');
 
-contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessionWallet, makerSessionWallet]) {
+contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessionWallet, makerSessionWallet, frontendWallet, ownerWalletNew]) {
 
     /*
         LLDEX session wallets
@@ -58,7 +58,7 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
         this.dai = await TokenMock.new('DAI Token', 'DAI');
         this.weth = await TokenMock.new('WETH Token', 'WETH');
 
-        this.lldex = await LLDEXProtocol.new();
+        this.lldex = await LLDEXProtocol.new(25);
 
         // We get the chain id from the contract because Ganache (used for coverage) does not return the same chain id
         // from within the EVM as from the JSON RPC interface.
@@ -513,7 +513,7 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
                 takerAsset: this.dai.address,
                 makerAsset: this.weth.address,
                 feeTokenAddress: this.fee.address,
-                frontendAddress: takerWallet,
+                frontendAddress: frontendWallet,
                 takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 15).encodeABI(),
                 makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 15).encodeABI(),
             };
@@ -527,6 +527,166 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
             expect(balanceAfter).to.be.bignumber.equal('10');
         });
 
+        it('should fill whole OrderRFQ and withdraw fee from maker and give bonus to frontend and taker', async function () {
+            await createSessions(this.lldex);
+            await this.lldex.depositToken(this.fee.address, 400, { from: makerWallet });
+            const balanceBeforeMaker = await this.lldex.balance(this.fee.address, { from: makerWallet });
+            const balanceBeforeFrontend = await this.lldex.balance(this.fee.address, { from: frontendWallet });
+            const balanceBeforeTaker = await this.lldex.balance(this.fee.address, { from: takerWallet });
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: '400',
+                takerAsset: this.dai.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.fee.address,
+                frontendAddress: frontendWallet,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 15).encodeABI(),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 15).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            await this.lldex.fillOrderRFQ(order, signature, 15, 0, { from: makerSessionWallet });
+            const balanceAfterMaker = await this.lldex.balance(this.fee.address, { from: makerWallet });
+            const balanceAfterFrontend = await this.lldex.balance(this.fee.address, { from: frontendWallet });
+            const balanceAfterTaker = await this.lldex.balance(this.fee.address, { from: takerWallet });
+
+            expect(balanceBeforeMaker).to.be.bignumber.equal('400');
+            expect(balanceAfterMaker).to.be.bignumber.equal('0');
+
+            expect(balanceBeforeFrontend).to.be.bignumber.equal('0');
+            expect(balanceAfterFrontend).to.be.bignumber.equal('100');
+
+            expect(balanceBeforeTaker).to.be.bignumber.equal('0');
+            expect(balanceAfterTaker).to.be.bignumber.equal('300');
+        });
+
+        it('should fill whole OrderRFQ and withdraw fee from maker and give bonus to frontend and taker then emit SplitTokenTransfered event', async function () {
+            await createSessions(this.lldex);
+            await this.lldex.depositToken(this.fee.address, 400, { from: makerWallet });
+            const balanceBeforeMaker = await this.lldex.balance(this.fee.address, { from: makerWallet });
+            const balanceBeforeFrontend = await this.lldex.balance(this.fee.address, { from: frontendWallet });
+            const balanceBeforeTaker = await this.lldex.balance(this.fee.address, { from: takerWallet });
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: '400',
+                takerAsset: this.dai.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.fee.address,
+                frontendAddress: frontendWallet,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 15).encodeABI(),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 15).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            const receipt = await this.lldex.fillOrderRFQ(order, signature, 15, 0, { from: makerSessionWallet });
+            const balanceAfterMaker = await this.lldex.balance(this.fee.address, { from: makerWallet });
+            const balanceAfterFrontend = await this.lldex.balance(this.fee.address, { from: frontendWallet });
+            const balanceAfterTaker = await this.lldex.balance(this.fee.address, { from: takerWallet });
+
+            expect(balanceBeforeMaker).to.be.bignumber.equal('400');
+            expect(balanceAfterMaker).to.be.bignumber.equal('0');
+
+            expect(balanceBeforeFrontend).to.be.bignumber.equal('0');
+            expect(balanceAfterFrontend).to.be.bignumber.equal('100');
+
+            expect(balanceBeforeTaker).to.be.bignumber.equal('0');
+            expect(balanceAfterTaker).to.be.bignumber.equal('300');
+
+            expectEvent(receipt, 'SplitTokenTransfered', { 
+                from: makerWallet,
+                recipient: takerWallet,
+                splitTo: frontendWallet,
+                token: this.fee.address,
+                splitPercentage: '25',
+                amount: '400',
+                balance: '0'
+            });
+        });
+
+        it('should fill whole OrderRFQ and withdraw fee from maker and give bonus to frontend then emit TokenTransfered event', async function () {
+            await createSessions(this.lldex);
+            await this.lldex.depositToken(this.fee.address, 400, { from: makerWallet });
+            const balanceBeforeMaker = await this.lldex.balance(this.fee.address, { from: makerWallet });
+            const balanceBeforeFrontend = await this.lldex.balance(this.fee.address, { from: frontendWallet });
+            const balanceBeforeTaker = await this.lldex.balance(this.fee.address, { from: takerWallet });
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: '400',
+                takerAsset: this.dai.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.fee.address,
+                frontendAddress: frontendWallet,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 15).encodeABI(),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 15).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            await this.lldex.setReferralBonus(0, { from: takerWallet });
+            const receipt = await this.lldex.fillOrderRFQ(order, signature, 15, 0, { from: makerSessionWallet });
+            const balanceAfterMaker = await this.lldex.balance(this.fee.address, { from: makerWallet });
+            const balanceAfterFrontend = await this.lldex.balance(this.fee.address, { from: frontendWallet });
+            const balanceAfterTaker = await this.lldex.balance(this.fee.address, { from: takerWallet });
+
+            expect(balanceBeforeMaker).to.be.bignumber.equal('400');
+            expect(balanceAfterMaker).to.be.bignumber.equal('0');
+
+            expect(balanceBeforeFrontend).to.be.bignumber.equal('0');
+            expect(balanceAfterFrontend).to.be.bignumber.equal('400');
+
+            expect(balanceBeforeTaker).to.be.bignumber.equal('0');
+            expect(balanceAfterTaker).to.be.bignumber.equal('0');
+
+            expectEvent(receipt, 'TokenTransfered', { 
+                from: makerWallet,
+                recipient: frontendWallet,
+                token: this.fee.address,
+                amount: '400',
+                balance: '0'
+            });
+        });
+
+        it('should fill whole OrderRFQ and not withdraw fees if frontend address is 0', async function () {
+            await createSessions(this.lldex);
+            await this.lldex.depositToken(this.fee.address, 400, { from: makerWallet });
+            const balanceBeforeMaker = await this.lldex.balance(this.fee.address, { from: makerWallet });
+            const balanceBeforeFrontend = await this.lldex.balance(this.fee.address, { from: frontendWallet });
+            const balanceBeforeTaker = await this.lldex.balance(this.fee.address, { from: takerWallet });
+
+            const order = {
+                info: generateRFQOrderInfo('1', (expireInTimestamp + 7200).toString()),
+                feeAmount: '400',
+                takerAsset: this.dai.address,
+                makerAsset: this.weth.address,
+                feeTokenAddress: this.fee.address,
+                frontendAddress: zeroAddress,
+                takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 15).encodeABI(),
+                makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 15).encodeABI(),
+            };
+            const data = buildOrderRFQData(this.chainId, this.lldex.address, order);
+            const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
+
+            await this.lldex.fillOrderRFQ(order, signature, 15, 0, { from: makerSessionWallet });
+            const balanceAfterMaker = await this.lldex.balance(this.fee.address, { from: makerWallet });
+            const balanceAfterFrontend = await this.lldex.balance(this.fee.address, { from: frontendWallet });
+            const balanceAfterTaker = await this.lldex.balance(this.fee.address, { from: takerWallet });
+
+            expect(balanceBeforeMaker).to.be.bignumber.equal('400');
+            expect(balanceAfterMaker).to.be.bignumber.equal('400');
+
+            expect(balanceBeforeFrontend).to.be.bignumber.equal('0');
+            expect(balanceAfterFrontend).to.be.bignumber.equal('0');
+
+            expect(balanceBeforeTaker).to.be.bignumber.equal('0');
+            expect(balanceAfterTaker).to.be.bignumber.equal('0');
+        });
+
+
         it('should revert if fee amount is greater than maker balance', async function () {
             await createSessions(this.lldex);
             await this.lldex.depositToken(this.fee.address, 15, { from: makerWallet });
@@ -537,7 +697,7 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
                 takerAsset: this.dai.address,
                 makerAsset: this.weth.address,
                 feeTokenAddress: this.fee.address,
-                frontendAddress: takerWallet,
+                frontendAddress: frontendWallet,
                 takerAssetData: this.dai.contract.methods.transferFrom(takerWallet, makerWallet, 15).encodeABI(),
                 makerAssetData: this.weth.contract.methods.transferFrom(makerWallet, takerWallet, 15).encodeABI(),
             };
@@ -905,6 +1065,48 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
                 this.lldex.withdrawToken(this.fee.address, 5),
                 'LLDEX: insufficient balance'
             )
+        });
+    });
+
+    describe('LLDEX-PM ownership', async function () {
+        it('mutableOwner should return current PM owner', async function () {
+            const owner = await this.lldex.mutableOwner();
+
+            expect(owner).to.be.eq(takerWallet);
+        });
+
+        it('transferOwnership should transfer ownership of PM to another address', async function () {
+            const ownerBefore = await this.lldex.mutableOwner();
+            await this.lldex.transferOwnership(ownerWalletNew, {from: takerWallet});
+            const ownerAfter = await this.lldex.mutableOwner();
+
+            expect(ownerBefore).to.be.eq(takerWallet);
+            expect(ownerAfter).to.be.eq(ownerWalletNew);
+        });
+
+        it('transferOwnership should revert if called by not an owner', async function () {
+            expectRevert(
+                this.lldex.transferOwnership(ownerWalletNew, {from: makerWallet}),
+                'MO: Access denied'
+            );
+        });
+    });
+
+    describe('LLDEX referral bonus', async function () {
+        it('setReferralBonus should set new splt bonus', async function () {
+            const bonusBefore = await this.lldex.getSplitBonus();
+            await this.lldex.setReferralBonus(55, { from: takerWallet });
+            const bonusAfter = await this.lldex.getSplitBonus();
+                
+            expect(bonusBefore).to.be.bignumber.equal('25');
+            expect(bonusAfter).to.be.bignumber.equal('55');
+        });
+
+        it('setReferralBonus should revert if called by not an owner', async function () {                
+            expectRevert(
+                this.lldex.setReferralBonus(55, { from: makerWallet }),
+                'MO: Access denied'
+            );
         });
     });
 

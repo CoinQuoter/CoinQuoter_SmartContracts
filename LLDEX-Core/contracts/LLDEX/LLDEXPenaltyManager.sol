@@ -7,10 +7,16 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./helpers/MutableOwner.sol";
+import "./helpers/SplitBonus.sol";
 import "./interfaces/IPenaltyManager.sol";
 
 // @title LLDEX Penalty Manager v1
-contract LLDEXPenaltyManager is MutableOwner(msg.sender), ReentrancyGuard, IPenaltyManager {
+contract LLDEXPenaltyManager is 
+    MutableOwner(msg.sender), 
+    SplitBonus,
+    ReentrancyGuard, 
+    IPenaltyManager 
+{
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -29,7 +35,7 @@ contract LLDEXPenaltyManager is MutableOwner(msg.sender), ReentrancyGuard, IPena
         _;
     }
 
-    constructor(address lldexAddress) {
+    constructor(address lldexAddress, uint256 splitBonus) SplitBonus(splitBonus, 100) {
         require(lldexAddress != address(0), "LLDEX-PM: 0 LLDEX token address");
 
         _lldexToken = IERC20(lldexAddress);
@@ -102,6 +108,37 @@ contract LLDEXPenaltyManager is MutableOwner(msg.sender), ReentrancyGuard, IPena
         return _balances[to];
     }
 
+    function issuePenaltySplit(address to, address splitRecipient, uint256 amount)
+        external
+        override
+        nonReentrant
+        collectorOnly
+        returns (uint256)
+    {
+        _validateTo(to);
+        _validateSR(splitRecipient);
+
+        require(amount > 0, "LLDEX-PM: amount is 0");
+        require(to != splitRecipient, "LLDEX-PM: invalid sr address 0x4");
+        require(_balances[to] >= amount, "LLDEX-PM: insufficient balance");
+
+        _balances[to] -= amount;
+         if (SplitBonus.getSplitBonus() > 0) {
+            (uint256 bonusAmount, uint256 amountLeft) = SplitBonus._calculateBonus(amount);
+
+            _balances[mutableOwner()] += amountLeft;
+            _balances[splitRecipient] += bonusAmount;
+
+            emit SplitPenaltyIssued(to, splitRecipient, SplitBonus.getSplitBonus(), amount, _balances[to]);
+        } else {
+            _balances[mutableOwner()] += amount;
+
+            emit PenaltyIssued(to, amount, _balances[to]);
+        }
+
+        return _balances[to];
+    }
+
     function addCollector(address collector) external override onlyOwner {
         require(collector != address(0), "LLDEX-PM: invalid address 0x1");
 
@@ -137,10 +174,23 @@ contract LLDEXPenaltyManager is MutableOwner(msg.sender), ReentrancyGuard, IPena
         return (msg.sender, to);
     }
 
+    function setSplitBonus(uint256 bonus)
+        external
+        onlyOwner
+    {
+        SplitBonus._setSplitBonus(bonus);
+    }
+
     function _validateTo(address to) internal view {
         require(to != address(0), "LLDEX-PM: invalid to address 0x1");
         require(to != address(this), "LLDEX-PM: invalid to address 0x2");
         require(to != msg.sender, "LLDEX-PM: invalid to address 0x3");
+    }
+
+    function _validateSR(address sr) internal view {
+        require(sr != address(0), "LLDEX-PM: invalid sr address 0x1");
+        require(sr != address(this), "LLDEX-PM: invalid sr address 0x2");
+        require(sr != msg.sender, "LLDEX-PM: invalid sr address 0x3");
     }
 
     function _validateAddress(address addr) internal view {

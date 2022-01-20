@@ -4,7 +4,7 @@ const { expect } = require('chai');
 const TokenMock = artifacts.require('TokenMock');
 const LLDEXPenaltyManager = artifacts.require('LLDEXPenaltyManager');
 
-contract('LLDEXPenaltyManager', async function ([makerWallet1, makerWallet2, ownerWallet, ownerWalletNew, collectorAddress1, collectorAddress2]) {
+contract('LLDEXPenaltyManager', async function ([makerWallet1, makerWallet2, ownerWallet, ownerWalletNew, collectorAddress1, collectorAddress2, takerWallet]) {
     /*
         Misc
     */
@@ -12,7 +12,7 @@ contract('LLDEXPenaltyManager', async function ([makerWallet1, makerWallet2, own
 
     beforeEach(async function () {
         this.lldexToken = await TokenMock.new('LLDEX Token', 'LLDEX');
-        this.lldexPM = await LLDEXPenaltyManager.new(this.lldexToken.address, { from: ownerWallet });
+        this.lldexPM = await LLDEXPenaltyManager.new(this.lldexToken.address, 25, { from: ownerWallet });
 
         await this.lldexToken.mint(makerWallet1, '1000');
         await this.lldexToken.mint(makerWallet2, '1000');
@@ -319,6 +319,112 @@ contract('LLDEXPenaltyManager', async function ([makerWallet1, makerWallet2, own
         });
     });
 
+    describe('LLDEX-PM split penalty issuing', async function () {
+        it('issuePenaltySplit should transfer 75% amount of balance of fined account to owner and 25% to recipient', async function () {
+            await this.lldexPM.depositToken(200);
+            await this.lldexPM.addCollector(collectorAddress1, {from: ownerWallet})
+
+            const maker1Balance = await this.lldexPM.balanceOf(makerWallet1);
+            const ownerBalance = await this.lldexPM.balanceOf(ownerWallet);
+
+            await this.lldexPM.issuePenaltySplit(makerWallet1, takerWallet, 100, {from: collectorAddress1});
+
+            expect(maker1Balance).to.be.bignumber.equal('200');
+            expect(ownerBalance).to.be.bignumber.equal('0');
+            expect(await this.lldexPM.balanceOf(makerWallet1)).to.be.bignumber.equal('100');
+            expect(await this.lldexPM.balanceOf(ownerWallet)).to.be.bignumber.equal('75');
+            expect(await this.lldexPM.balanceOf(takerWallet)).to.be.bignumber.equal('25');
+            expect(await this.lldexToken.balanceOf(makerWallet1)).to.be.bignumber.equal('800');
+            expect(await this.lldexToken.balanceOf(ownerWallet)).to.be.bignumber.equal('0');
+        });
+
+        it('issuePenaltySplit should revert if called by not collector account', async function () {
+            expectRevert(
+                this.lldexPM.issuePenaltySplit(makerWallet1, takerWallet, 100),
+                'LLDEX-PM: not collector'
+            );
+        });
+
+        it('issuePenaltySplit should revert if to address is 0', async function () {
+            await this.lldexPM.addCollector(collectorAddress1, {from: ownerWallet})
+
+            expectRevert(
+                this.lldexPM.issuePenaltySplit(zeroAddress, takerWallet, 50, {from: collectorAddress1}),
+                'LLDEX-PM: invalid to address 0x1'
+            );
+        });
+
+
+        it('issuePenaltySplit should revert if to address is PM address', async function () {
+            await this.lldexPM.addCollector(collectorAddress1, {from: ownerWallet})
+
+            expectRevert(
+                this.lldexPM.issuePenaltySplit(this.lldexPM.address, takerWallet, 50, {from: collectorAddress1}),
+                'LLDEX-PM: invalid to address 0x2'
+            );
+        });
+
+        it('issuePenaltySplit should revert if to address is sender address', async function () {
+            await this.lldexPM.addCollector(collectorAddress1, {from: ownerWallet})
+
+            expectRevert(
+                this.lldexPM.issuePenaltySplit(collectorAddress1, takerWallet, 50, {from: collectorAddress1}),
+                'LLDEX-PM: invalid to address 0x3'
+            );
+        });
+
+        it('issuePenaltySplit should revert if split recipient address is 0', async function () {
+            await this.lldexPM.addCollector(collectorAddress1, {from: ownerWallet})
+
+            expectRevert(
+                this.lldexPM.issuePenaltySplit(makerWallet1, zeroAddress, 50, {from: collectorAddress1}),
+                'LLDEX-PM: invalid sr address 0x1'
+            );
+        });
+
+
+        it('issuePenaltySplit should revert if split recipient address is PM address', async function () {
+            await this.lldexPM.addCollector(collectorAddress1, {from: ownerWallet})
+
+            expectRevert(
+                this.lldexPM.issuePenaltySplit(makerWallet1, this.lldexPM.address, 50, {from: collectorAddress1}),
+                'LLDEX-PM: invalid sr address 0x2'
+            );
+        });
+
+        it('issuePenaltySplit should revert if split recipient address is sender address', async function () {
+            await this.lldexPM.addCollector(collectorAddress1, {from: ownerWallet})
+
+            expectRevert(
+                this.lldexPM.issuePenaltySplit(makerWallet1, collectorAddress1, 50, {from: collectorAddress1}),
+                'LLDEX-PM: invalid sr address 0x3'
+            );
+        });
+
+        it('issuePenaltySplit should revert if balance of charged account exceeds fine amount', async function () {
+            await this.lldexPM.addCollector(collectorAddress1, {from: ownerWallet})
+
+            expectRevert(
+                this.lldexPM.issuePenaltySplit(makerWallet1, takerWallet, 50, {from: collectorAddress1}),
+                'LLDEX-PM: insufficient balance'
+            );
+        });
+
+        it('issuePenaltySplit should emit event SplitPenaltyIssued', async function () {
+            await this.lldexPM.depositToken(150);
+            await this.lldexPM.addCollector(collectorAddress1, {from: ownerWallet})
+            const receipt = await this.lldexPM.issuePenaltySplit(makerWallet1, takerWallet, 100, {from: collectorAddress1});
+
+            expectEvent(receipt, 'SplitPenaltyIssued', { 
+                receiver: makerWallet1,
+                splitTo: takerWallet,
+                splitPercentage: '25',
+                amount: '100',
+                balance: '50'
+            });
+        });
+    });
+
     describe('LLDEX-PM collectors', async function () {
         it('addCollector should add new collector', async function () {
             const isCollectorBefore = await this.lldexPM.isCollector(collectorAddress1);
@@ -409,6 +515,24 @@ contract('LLDEXPenaltyManager', async function ([makerWallet1, makerWallet2, own
         it('transferOwnership should revert if called by not an owner', async function () {
             expectRevert(
                 this.lldexPM.transferOwnership(ownerWalletNew),
+                'MO: Access denied'
+            );
+        });
+    });
+
+    describe('LLDEX-PM split bonus', async function () {
+        it('setSplitBonus should set new splt bonus', async function () {
+            const bonusBefore = await this.lldexPM.getSplitBonus();
+            await this.lldexPM.setSplitBonus(55, { from: ownerWallet });
+            const bonusAfter = await this.lldexPM.getSplitBonus();
+                
+            expect(bonusBefore).to.be.bignumber.equal('25');
+            expect(bonusAfter).to.be.bignumber.equal('55');
+        });
+
+        it('setSplitBonus should revert if called by not an owner', async function () {                
+            expectRevert(
+                this.lldexPM.setSplitBonus(55),
                 'MO: Access denied'
             );
         });

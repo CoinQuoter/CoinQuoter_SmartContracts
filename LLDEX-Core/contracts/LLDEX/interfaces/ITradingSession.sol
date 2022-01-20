@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 interface ITradingSession {
     /**
      * @notice Emitted on successful session creation
-     * @param creator address of account creating session
+     * @param creator address of wallet creating session
      * @param sessionKey public key of session
      * @param expirationTime session expiration time
      */
@@ -17,7 +17,7 @@ interface ITradingSession {
 
     /**
      * @notice Emitted on successful session creation
-     * @param sender address of account updating session
+     * @param sender address of wallet updating session
      * @param sessionKey public key of session
      * @param expirationTime session expiration time
      */
@@ -29,7 +29,7 @@ interface ITradingSession {
 
     /**
      * @notice Emitted on successful session creation
-     * @param sender address of account updating session
+     * @param sender address of wallet updating session
      * @param sessionKey public key of session
      */
     event SessionTerminated(address indexed sender, address indexed sessionKey);

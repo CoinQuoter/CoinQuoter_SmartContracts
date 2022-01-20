@@ -10,8 +10,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
+import "./helpers/MutableOwner.sol";
 import "./helpers/ERC1155Proxy.sol";
 import "./helpers/ERC721Proxy.sol";
+import "./helpers/SplitBonus.sol";
 import "./interfaces/IRFQOrder.sol";
 import "./interfaces/ITradingSession.sol";
 import "./interfaces/IBalanceAccessor.sol";
@@ -30,8 +32,10 @@ import "./libraries/ArgumentsDecoder.sol";
 
 // @title LLDEX Protocol v1
 contract LLDEXProtocol is
-    ImmutableOwner(address(this)),
     EIP712("1inch Limit Order Protocol", "1"),
+    ImmutableOwner(address(this)),
+    MutableOwner(msg.sender),
+    SplitBonus,
     ERC1155Proxy,
     ERC721Proxy,
     ReentrancyGuard,
@@ -75,9 +79,37 @@ contract LLDEXProtocol is
     // Mapping of session owner to session
     mapping(address => Session) private _sessions;
 
+    constructor(uint256 splitBonus) 
+        SplitBonus(splitBonus, 100)
+    // solhint-disable-next-line no-empty-blocks
+    {}
+
     // solhint-disable-next-line func-name-mixedcase
     function DOMAIN_SEPARATOR() external view returns (bytes32) {
         return _domainSeparatorV4();
+    }
+
+    function transferOwnership(address to)
+        external
+        onlyOwner
+        returns (address oldOwner, address newOwner)
+    {
+        _validateTo(to);
+        _mutateOwner(to);
+        return (msg.sender, to);
+    }
+
+    function setReferralBonus(uint256 bonus)
+        external
+        onlyOwner
+    {
+        SplitBonus._setSplitBonus(bonus);
+    }
+
+    function _validateTo(address to) internal view {
+        require(to != address(0), "LLDEX: invalid to address 0x1");
+        require(to != address(this), "LLDEX: invalid to address 0x2");
+        require(to != msg.sender, "LLDEX: invalid to address 0x3");
     }
 
     /// @notice Returns bitmask for double-spend invalidators based on lowest byte of order.info and filled quotes
@@ -275,13 +307,16 @@ contract LLDEXProtocol is
         OrderRFQAmounts memory amounts,
         bytes32 orderHash
     ) internal {
-        // Withdraw fee
-        _withdrawFee(
-            order.makerAssetData.decodeAddress(_FROM_INDEX),
-            order.frontendAddress,
-            order.feeTokenAddress,
-            order.feeAmount
-        );
+        if (order.frontendAddress != address(0) && order.feeAmount != 0) {
+            // Withdraw fee
+            _withdrawFee(
+                order.makerAssetData.decodeAddress(_FROM_INDEX),
+                order.takerAssetData.decodeAddress(_FROM_INDEX),
+                order.frontendAddress,
+                order.feeTokenAddress,
+                order.feeAmount
+            );
+        }
 
         _updateSessionTransactions(order.takerAssetData, order.makerAssetData);
 
@@ -522,10 +557,13 @@ contract LLDEXProtocol is
 
     function _withdrawFee(
         address maker,
+        address taker,
         address frontend,
         address feeToken,
         uint256 feeAmount
     ) internal {
+        require(frontend != taker, "LLDEX: invalid frontend 0");
+        require(frontend != maker, "LLDEX: invalid frontend 1");
         require(feeToken != address(0), "LLDEX: fee token empty");
         require(feeToken != address(this), "LLDEX: invalid fee token address");
         require(
@@ -534,7 +572,32 @@ contract LLDEXProtocol is
         );
 
         _balances[maker][feeToken].balance -= feeAmount;
-        _balances[frontend][feeToken].balance += feeAmount;
+        if (SplitBonus.getSplitBonus() > 0) {
+            (uint256 bonusAmount, uint256 amountLeft) = SplitBonus._calculateBonus(feeAmount);
+
+            _balances[frontend][feeToken].balance += bonusAmount;
+            _balances[taker][feeToken].balance += amountLeft;
+
+            emit SplitTokenTransfered(
+                maker, 
+                taker, 
+                frontend, 
+                feeToken, 
+                SplitBonus.getSplitBonus(), 
+                feeAmount, 
+                _balances[maker][feeToken].balance
+            );
+        } else {
+            _balances[frontend][feeToken].balance += feeAmount;
+
+            emit TokenTransfered(
+                maker, 
+                frontend, 
+                feeToken, 
+                feeAmount, 
+                _balances[maker][feeToken].balance
+            );
+        }
     }
 
     function depositToken(address token, uint256 amount)
