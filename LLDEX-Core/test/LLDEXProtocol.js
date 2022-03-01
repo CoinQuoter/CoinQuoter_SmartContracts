@@ -562,7 +562,7 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
             expect(balanceAfterTaker).to.be.bignumber.equal('300');
         });
 
-        it('should fill whole OrderRFQ and withdraw fee from maker and give bonus to frontend and taker then emit SplitTokenTransfered event', async function () {
+        it('should fill whole OrderRFQ and withdraw fee from maker and give bonus to frontend and owner then emit SplitTokenTransfered event', async function () {
             await createSessions(this.lldex);
             await this.lldex.depositToken(this.fee.address, 400, { from: makerWallet });
             const balanceBeforeMaker = await this.lldex.balance(this.fee.address, { from: makerWallet });

@@ -576,7 +576,7 @@ contract LLDEXProtocol is
             (uint256 bonusAmount, uint256 amountLeft) = SplitBonus._calculateBonus(feeAmount);
 
             _balances[frontend][feeToken].balance += bonusAmount;
-            _balances[taker][feeToken].balance += amountLeft;
+            _balances[mutableOwner()][feeToken].balance += amountLeft;
 
             emit SplitTokenTransfered(
                 maker, 
