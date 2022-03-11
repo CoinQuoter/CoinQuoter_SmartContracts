@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.1;
 
 /// @title A helper contract with helper modifiers to allow access to current contract owner and change the owner
 contract MutableOwner {

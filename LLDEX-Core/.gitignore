@@ -1,4 +1,7 @@
 node_modules
 artifacts
 cache
-coverage
+deployment/DeployAccount.json
+package-lock.json
+deployments
+.env

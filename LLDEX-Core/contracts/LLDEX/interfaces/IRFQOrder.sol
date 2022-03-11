@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.1;
 
 interface IRFQOrder {
     event OrderFilledRFQ(bytes32 orderHash, uint256 takingAmount, uint256 makingAmount);

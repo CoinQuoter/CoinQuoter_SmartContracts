@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.1;
 
 library ArgumentsDecoder {
     function decodeSelector(bytes memory data) internal pure returns (bytes4 selector) {

@@ -17,6 +17,7 @@
   "dependencies": {
     "@openzeppelin/contracts": "^4.3.2",
     "chai": "^4.3.4",
+    "dotenv": "^16.0.0",
     "ethereumjs-wallet": "^1.0.2"
   },
   "scripts": {
@@ -24,7 +25,11 @@
     "prettier:solidity": "./node_modules/.bin/prettier --write contracts/LLDEX/**/*.sol contracts/LLDEX/*.sol contracts/LLDEX/**/**/*.sol",
     "compile": "hardhat compile",
     "test": "hardhat test",
-    "coverage": "hardhat coverage"
+    "coverage": "hardhat coverage",
+    "build": "rm -rf deployments && rm -rf cache && rm -rf artifacts && npx hardhat compile",
+    "deploy:hmn_mainnet": "npm run build && npx hardhat deploy --network harmony_mainnet_shard0 --gasprice 50000000000",
+    "deploy:hmn_testnet": "npm run build && npx hardhat deploy --network harmony_testnet_shard0",
+    "deploy:bsc_testnet": "npm run build && npx hardhat deploy --network bsc_testnet"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-truffle5": "^2.0.2",
@@ -35,6 +40,7 @@
     "ethers": "^5.4.4",
     "hardhat": "^2.6.4",
     "hardhat-contract-sizer": "^2.1.1",
+    "hardhat-deploy": "^0.10.4",
     "hardhat-gas-reporter": "^1.0.4",
     "husky": "^7.0.4",
     "mocha": "^9.1.3",
