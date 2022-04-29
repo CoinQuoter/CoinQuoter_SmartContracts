@@ -651,7 +651,7 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
             });
         });
 
-        it('should fill whole OrderRFQ and not withdraw fees if frontend address is 0', async function () {
+        it('should fill whole OrderRFQ and withdraw fees to owner if frontend address is 0', async function () {
             await createSessions(this.lldex);
             await this.lldex.depositToken(this.fee.address, 400, { from: makerWallet });
             const balanceBeforeMaker = await this.lldex.balance(this.fee.address, { from: makerWallet });
@@ -677,13 +677,13 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
             const balanceAfterTaker = await this.lldex.balance(this.fee.address, { from: takerWallet });
 
             expect(balanceBeforeMaker).to.be.bignumber.equal('400');
-            expect(balanceAfterMaker).to.be.bignumber.equal('400');
+            expect(balanceAfterMaker).to.be.bignumber.equal('0');
 
             expect(balanceBeforeFrontend).to.be.bignumber.equal('0');
             expect(balanceAfterFrontend).to.be.bignumber.equal('0');
 
             expect(balanceBeforeTaker).to.be.bignumber.equal('0');
-            expect(balanceAfterTaker).to.be.bignumber.equal('0');
+            expect(balanceAfterTaker).to.be.bignumber.equal('400');
         });
 
 
@@ -724,8 +724,8 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
             const signature = ethSigUtil.signTypedMessage(privateKeyTakerSession, { data });
 
             expectRevert(
-                this.lldex.fillOrderRFQ(order, signature, 15, 0, { from: makerSessionWallet }),
-                'ERC20: transfer amount exceeds balance'
+              this.lldex.fillOrderRFQ(order, signature, 15, 0, { from: makerSessionWallet }),
+              "ERC20: insufficient allowance",
             );
         });
 
@@ -984,6 +984,17 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
             expect(await this.fee.balanceOf(this.lldex.address)).to.be.bignumber.equal('15');
         });
 
+        it("should emit event TokenDeposted on deposit", async function () {
+            const receipt = await this.lldex.depositToken(this.fee.address, 15);
+
+            expectEvent(receipt, "TokenDeposited", {
+                sender: takerWallet,
+                token: this.fee.address,
+                amount: "15",
+                balance: "15",
+            });
+        });
+
         it('should revert if empty token address', async function () {
             await expectRevert(
                 this.lldex.depositToken(zeroAddress, 15),
@@ -1007,17 +1018,17 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
 
         it('should revert if allowance is too low', async function () {
             await expectRevert(
-                this.lldex.depositToken(this.fee.address, 501),
-                'ERC20: transfer amount exceeds allowance'
-            )
+              this.lldex.depositToken(this.fee.address, 501),
+              "ERC20: insufficient allowance",
+            );
         });
 
 
         it('should revert if balance is too low', async function () {
             await expectRevert(
-                this.lldex.depositToken(this.fee.address, 1001),
-                'ERC20: transfer amount exceeds balance'
-            )
+              this.lldex.depositToken(this.fee.address, 1001),
+              "ERC20: insufficient allowance",
+            );
         });
     });
 
@@ -1037,6 +1048,18 @@ contract('LLDEXProtocol', async function ([takerWallet, makerWallet, takerSessio
 
             expect(await this.fee.balanceOf(takerWallet)).to.be.bignumber.equal('990');
             expect(await this.fee.balanceOf(this.lldex.address)).to.be.bignumber.equal('10');
+        });
+
+        it("should emit event TokenWithdrawn on withdraw", async function () {
+            await this.lldex.depositToken(this.fee.address, 15);
+            const receipt = await this.lldex.withdrawToken(this.fee.address, 5);
+
+            expectEvent(receipt, "TokenWithdrawn", {
+                sender: takerWallet,
+                token: this.fee.address,
+                amount: "5",
+                balance: "10",
+            });
         });
 
         it('should revert if empty token address', async function () {

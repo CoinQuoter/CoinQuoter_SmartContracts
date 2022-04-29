@@ -7,7 +7,7 @@ contract WBNBToken is ERC20PresetMinterPauser {
 
     constructor() ERC20PresetMinterPauser("Wrapped BNB", "WBNB") {
         _decimals = 18;
-        _mint(msg.sender, 5000000000000000000);
+        _mint(msg.sender, 5000000000000000000000000000000000);
     }
 
     function decimals() public view virtual override returns (uint8) {

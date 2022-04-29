@@ -5,20 +5,24 @@ const defaultCollector = process.env.LLDEX_PM_DEFAULT_COLLECTOR;
 const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
 
 module.exports = async ({ getNamedAccounts, ethers, deployments }) => {
-    const { deploy, execute } = deployments;
+  const { deploy, execute } = deployments;
 
-    const lldex = await deployments.get("LLDEXProtocol");
-    await deploy("LLDEXPenaltyManager", {
-        from: privateKey,
-        args: [lldex.address, splitBonus],
-        log: true,
-    });
+  //await deployments.get("LLDEXToken")
+  const lldexTokenAddress = "0x65e3E8A0218F56858DDD669eF2B2e42f928749cD";
+  await deploy("LLDEXPenaltyManager", {
+    from: privateKey,
+    args: [lldexTokenAddress, splitBonus],
+    log: true,
+  });
 
-    console.log(defaultCollector);
+  console.log(defaultCollector);
 
-    await execute("LLDEXPenaltyManager", { from: privateKey, log: true }, "addCollector", 
-      defaultCollector,
-    );
+  await execute(
+    "LLDEXPenaltyManager",
+    { from: privateKey, log: true },
+    "addCollector",
+    defaultCollector,
+  );
 };
 module.exports.tags = ["LLDEX-PM"];
 module.exports.dependencies = ["LLDEX-Core"];

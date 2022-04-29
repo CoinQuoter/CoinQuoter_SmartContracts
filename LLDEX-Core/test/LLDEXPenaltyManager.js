@@ -62,17 +62,11 @@ contract('LLDEXPenaltyManager', async function ([makerWallet1, makerWallet2, own
         });
 
         it('depositToken should revert if amount exeeds allowance', async function () {
-            expectRevert(
-                this.lldexPM.depositToken(501),
-                'ERC20: transfer amount exceeds allowance'
-            );
+            expectRevert(this.lldexPM.depositToken(501), "ERC20: insufficient allowance");
         });
 
         it('depositToken should revert if amount exeeds allowance', async function () {
-            expectRevert(
-                this.lldexPM.depositToken(501),
-                'ERC20: transfer amount exceeds allowance'
-            );
+            expectRevert(this.lldexPM.depositToken(501), "ERC20: insufficient allowance");
         });
 
         it('depositToken should emit event TokenDeposited on deposit', async function () {
@@ -155,26 +149,26 @@ contract('LLDEXPenaltyManager', async function ([makerWallet1, makerWallet2, own
         });
 
 
-        it('withdrawToken should emit event TokenWithdrawed on withdraw', async function () {
+        it('withdrawToken should emit event TokenWithdrawn on withdraw', async function () {
             await this.lldexPM.depositToken(250);
             const receipt = await this.lldexPM.withdrawToken(100);
 
-            expectEvent(receipt, 'TokenWithdrawed', { 
-                sender: makerWallet1,
-                amount: '100',
-                balance: '150'
+            expectEvent(receipt, "TokenWithdrawn", {
+              sender: makerWallet1,
+              amount: "100",
+              balance: "150",
             });
         });
 
-        it('withdrawTokenTo should emit event TokenWithdrawed on withdraw', async function () {
-            await this.lldexPM.depositToken(250);
-            const receipt = await this.lldexPM.withdrawTokenTo(makerWallet2, 100);
+        it("withdrawTokenTo should emit event TokenWithdrawn on withdraw", async function () {
+          await this.lldexPM.depositToken(250);
+          const receipt = await this.lldexPM.withdrawTokenTo(makerWallet2, 100);
 
-            expectEvent(receipt, 'TokenWithdrawed', { 
-                sender: makerWallet1,
-                amount: '100',
-                balance: '150'
-            });
+          expectEvent(receipt, "TokenWithdrawn", {
+            sender: makerWallet1,
+            amount: "100",
+            balance: "150",
+          });
         });
     });
 

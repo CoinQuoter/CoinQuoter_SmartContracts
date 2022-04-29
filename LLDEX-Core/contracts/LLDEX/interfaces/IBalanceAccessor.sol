@@ -20,11 +20,11 @@ interface IBalanceAccessor {
     /**
      * @notice Emitted on successful withdrawn of token
      * @param sender address of wallet withdrawing token
-     * @param token address of withdrawed token
+     * @param token address of withdrawn token
      * @param amount withdraw amount
      * @param balance sender balance after withdraw
      */
-    event TokenWithdrawed(
+    event TokenWithdrawn(
         address indexed sender,
         address indexed token,
         uint256 amount,
@@ -32,12 +32,12 @@ interface IBalanceAccessor {
     );
 
     /**
-     * @notice Emitted on successful withdrawn of token
-     * @param from address of wallet withdrawing token
+     * @notice Emitted on successful transfer of token
+     * @param from address of wallet transfering token
      * @param recipient address of token recipient
-     * @param token address of withdrawed token
+     * @param token address of transfered token
      * @param amount withdraw amount
-     * @param balance sender balance after withdraw
+     * @param balance sender balance after transfer
      */
     event TokenTransfered(
         address indexed from,
@@ -48,7 +48,7 @@ interface IBalanceAccessor {
     );
 
     /**
-     * @notice Emitted on successful withdrawn of token - split between taker and frontend
+     * @notice Emitted on successful transfer of token - split between taker and frontend
      * @param from address of wallet that transfers token
      * @param recipient address of first recipient
      * @param splitTo address of second recipient

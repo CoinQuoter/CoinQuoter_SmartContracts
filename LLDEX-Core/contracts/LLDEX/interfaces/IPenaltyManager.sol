@@ -21,7 +21,7 @@ interface IPenaltyManager {
      * @param amount withdraw amount
      * @param balance sender balance after withdraw
      */
-    event TokenWithdrawed(
+    event TokenWithdrawn(
         address indexed sender,
         uint256 amount,
         uint256 balance

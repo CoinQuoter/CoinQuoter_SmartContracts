@@ -7,7 +7,7 @@ contract WBTCToken is ERC20PresetMinterPauser {
 
     constructor() ERC20PresetMinterPauser("Wrapped Bitcoin", "WBTC") {
         _decimals = 8;
-        _mint(msg.sender, 5000000000000000000);
+        _mint(msg.sender, 500000000000000000000);
     }
 
     function decimals() public view virtual override returns (uint8) {

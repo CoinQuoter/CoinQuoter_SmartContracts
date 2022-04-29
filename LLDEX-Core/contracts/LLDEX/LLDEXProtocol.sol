@@ -307,7 +307,7 @@ contract LLDEXProtocol is
         OrderRFQAmounts memory amounts,
         bytes32 orderHash
     ) internal {
-        if (order.frontendAddress != address(0) && order.feeAmount != 0) {
+        if (order.feeAmount != 0) {
             // Withdraw fee
             _withdrawFee(
                 order.makerAssetData.decodeAddress(_FROM_INDEX),
@@ -563,7 +563,6 @@ contract LLDEXProtocol is
         uint256 feeAmount
     ) internal {
         require(frontend != taker, "LLDEX: invalid frontend 0");
-        require(frontend != maker, "LLDEX: invalid frontend 1");
         require(feeToken != address(0), "LLDEX: fee token empty");
         require(feeToken != address(this), "LLDEX: invalid fee token address");
         require(
@@ -573,10 +572,14 @@ contract LLDEXProtocol is
 
         _balances[maker][feeToken].balance -= feeAmount;
         if (SplitBonus.getSplitBonus() > 0) {
-            (uint256 bonusAmount, uint256 amountLeft) = SplitBonus._calculateBonus(feeAmount);
+            if (frontend != address(0)) {
+                (uint256 bonusAmount, uint256 amountLeft) = SplitBonus._calculateBonus(feeAmount);
 
-            _balances[frontend][feeToken].balance += bonusAmount;
-            _balances[mutableOwner()][feeToken].balance += amountLeft;
+                _balances[frontend][feeToken].balance += bonusAmount;
+                _balances[mutableOwner()][feeToken].balance += amountLeft;
+            } else {
+                _balances[mutableOwner()][feeToken].balance += feeAmount;
+            }
 
             emit SplitTokenTransfered(
                 maker, 
@@ -612,8 +615,9 @@ contract LLDEXProtocol is
 
         IERC20 tokenERC20 = IERC20(token);
         tokenERC20.safeTransferFrom(msg.sender, address(this), amount);
-
         _balances[msg.sender][token].balance += amount;
+
+        emit TokenDeposited(msg.sender, token, amount, _balances[msg.sender][token].balance);
         return _balances[msg.sender][token].balance;
     }
 
@@ -633,6 +637,7 @@ contract LLDEXProtocol is
 
         _balances[msg.sender][token].balance -= amount;
 
+        emit TokenWithdrawn(msg.sender, token, amount, _balances[msg.sender][token].balance);
         return _balances[msg.sender][token].balance;
     }
 

@@ -55,7 +55,7 @@ contract LLDEXPenaltyManager is
     function withdrawToken(uint256 amount) external override nonReentrant returns (uint256) {
         _withdrawTransferTo(msg.sender, amount);
 
-        emit TokenWithdrawed(msg.sender, amount, _balances[msg.sender]);
+        emit TokenWithdrawn(msg.sender, amount, _balances[msg.sender]);
         return _balances[msg.sender];
     }
 
@@ -67,7 +67,7 @@ contract LLDEXPenaltyManager is
     {
         _withdrawTransferTo(to, amount);
 
-        emit TokenWithdrawed(msg.sender, amount, _balances[msg.sender]);
+        emit TokenWithdrawn(msg.sender, amount, _balances[msg.sender]);
         return _balances[msg.sender];
     }
 
