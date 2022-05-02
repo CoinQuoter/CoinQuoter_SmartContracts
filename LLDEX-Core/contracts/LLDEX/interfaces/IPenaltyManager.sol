@@ -32,11 +32,15 @@ interface IPenaltyManager {
      * @param from address of wallet transfering balance to @to
      * @param to address of wallet receiving balance
      * @param amount amount of balance transfered
+     * @param balanceFrom balance of sender after transfer
+     * @param balanceTo balance of recipient after transfer
      */
     event BalanceTransfered(
         address indexed from,
         address indexed to,
-        uint256 amount
+        uint256 amount,
+        uint256 balanceFrom,
+        uint256 balanceTo
     );
 
     /**

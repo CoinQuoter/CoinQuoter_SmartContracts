@@ -85,7 +85,13 @@ contract LLDEXPenaltyManager is
         _balances[msg.sender] -= amount;
         _balances[to] += amount;
 
-        emit BalanceTransfered(msg.sender, to, amount);
+        emit BalanceTransfered(
+            msg.sender, 
+            to, 
+            amount, 
+            _balances[msg.sender], 
+            _balances[to]
+        );
         return (_balances[msg.sender], _balances[to]);
     }
 

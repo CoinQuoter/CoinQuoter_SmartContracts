@@ -233,7 +233,9 @@ contract('LLDEXPenaltyManager', async function ([makerWallet1, makerWallet2, own
             expectEvent(receipt, 'BalanceTransfered', { 
                 from: makerWallet1,
                 to: makerWallet2,
-                amount: '100'
+                amount: '100',
+                balanceFrom: '150',
+                balanceTo: '100'
             });
         });
     });

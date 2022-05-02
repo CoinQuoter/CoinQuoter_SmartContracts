@@ -37,7 +37,7 @@ interface IBalanceAccessor {
      * @param recipient address of token recipient
      * @param token address of transfered token
      * @param amount withdraw amount
-     * @param balance sender balance after transfer
+     * @param balance from balance after transfer
      */
     event TokenTransfered(
         address indexed from,
@@ -48,14 +48,14 @@ interface IBalanceAccessor {
     );
 
     /**
-     * @notice Emitted on successful transfer of token - split between taker and frontend
+     * @notice Emitted on successful transfer of fee token - split between contract owner and frontend
      * @param from address of wallet that transfers token
      * @param recipient address of first recipient
      * @param splitTo address of second recipient
      * @param token address of deposited token
      * @param splitPercentage percentage used to split @amount between @recipient and @splitTo
      * @param amount deposit amount
-     * @param balance sender balance after deposit
+     * @param balance from balance after fee token transfer
      */
     event SplitTokenTransfered(
         address indexed from,
