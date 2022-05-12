@@ -10,9 +10,7 @@
     "contracts/libraries",
     "contracts/interfaces",
     "contracts/mocks",
-    "contracts/LimitOrderProtocol.sol",
-    "artifacts/contracts/Limit-order-protocol/**/*.json",
-    "!artifacts/contracts/Limit-order-protocol/**/*.dbg.json"
+    "contracts/QuoterProtocol.sol"
   ],
   "dependencies": {
     "@openzeppelin/contracts": "^4.3.2",

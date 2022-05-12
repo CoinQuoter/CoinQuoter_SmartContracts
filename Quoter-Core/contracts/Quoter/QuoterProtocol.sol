@@ -59,7 +59,7 @@ contract QuoterProtocol is
         _;
     }
 
-    bytes32 public constant LIMIT_ORDER_RFQ_TYPEHASH =
+    bytes32 public constant QUOTER_ORDER_RFQ_TYPEHASH =
         keccak256(
             "OrderRFQ(uint256 info,uint256 feeAmount,address takerAsset,address makerAsset,address feeTokenAddress,address frontendAddress,bytes takerAssetData,bytes makerAssetData)"
         );
@@ -410,7 +410,7 @@ contract QuoterProtocol is
             _hashTypedDataV4(
                 keccak256(
                     abi.encode(
-                        LIMIT_ORDER_RFQ_TYPEHASH,
+                        QUOTER_ORDER_RFQ_TYPEHASH,
                         order.info,
                         order.feeAmount,
                         order.takerAsset,
