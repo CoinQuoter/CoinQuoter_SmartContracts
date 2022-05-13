@@ -7,7 +7,7 @@ const QuoterProtocol = artifacts.require('QuoterProtocol');
 describe('QuoterProtocol-EIP712', async function () {
     beforeEach(async function () {
         this.token = await TokenMock.new('-', '-');
-        this.swap = await QuoterProtocol.new(25);
+        this.protocol = await QuoterProtocol.new(25, "0x0000000000000000000000000000000000000000");
 
         // We get the chain id from the contract because Ganache (used for coverage) does not return the same chain id
         // from within the EVM as from the JSON RPC interface.
@@ -16,10 +16,8 @@ describe('QuoterProtocol-EIP712', async function () {
     });
 
     it('domain separator', async function () {
-        expect(
-            await this.swap.DOMAIN_SEPARATOR(),
-        ).to.equal(
-            domainSeparator(name, version, this.chainId, this.swap.address),
+        expect(await this.protocol.DOMAIN_SEPARATOR()).to.equal(
+          domainSeparator(name, version, this.chainId, this.protocol.address),
         );
     });
 });

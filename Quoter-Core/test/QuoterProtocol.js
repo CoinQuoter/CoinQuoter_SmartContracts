@@ -58,7 +58,7 @@ contract('QuoterProtocol', async function ([takerWallet, makerWallet, takerSessi
         this.dai = await TokenMock.new('DAI Token', 'DAI');
         this.weth = await TokenMock.new('WETH Token', 'WETH');
 
-        this.quoter = await QuoterProtocol.new(25);
+        this.quoter = await QuoterProtocol.new(25, takerWallet);
 
         // We get the chain id from the contract because Ganache (used for coverage) does not return the same chain id
         // from within the EVM as from the JSON RPC interface.
@@ -81,6 +81,14 @@ contract('QuoterProtocol', async function ([takerWallet, makerWallet, takerSessi
 
         await this.fee.approve(this.quoter.address, '500', { from: takerWallet });
         await this.fee.approve(this.quoter.address, '500', { from: makerWallet });
+    });
+
+    describe('Protocol owner - mutableOwner', async function () {
+        it("mutableOwner should return protocol owner", async function () {
+          const owner = await this.quoter.mutableOwner();
+
+          expect(owner).to.be.equal(takerWallet);
+        });
     });
 
     describe('Session system - createOrUpdateSession', async function () {

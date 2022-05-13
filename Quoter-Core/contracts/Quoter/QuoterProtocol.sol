@@ -34,7 +34,7 @@ import "./libraries/ArgumentsDecoder.sol";
 contract QuoterProtocol is
     EIP712("Quoter Protocol", "1"),
     ImmutableOwner(address(this)),
-    MutableOwner(msg.sender),
+    MutableOwner,
     SplitBonus,
     ERC1155Proxy,
     ERC721Proxy,
@@ -79,7 +79,8 @@ contract QuoterProtocol is
     // Mapping of session owner to session
     mapping(address => Session) private _sessions;
 
-    constructor(uint256 splitBonus) 
+    constructor(uint256 splitBonus, address owner)
+        MutableOwner(owner) 
         SplitBonus(splitBonus, 100)
     // solhint-disable-next-line no-empty-blocks
     {}

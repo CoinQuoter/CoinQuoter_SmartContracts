@@ -25,13 +25,15 @@
     "test": "hardhat test",
     "coverage": "hardhat coverage",
     "build": "rm -rf deployments && rm -rf cache && rm -rf artifacts && npx hardhat compile",
-    "deploy:hmn_mainnet": "npm run build && npx hardhat deploy --network harmony_mainnet_shard0 --gasprice 50000000000",
+    "deploy-multisig:hmn_mainnet": "npm run build && npx hardhat deploy --network harmony_mainnet_shard0 --tags Quoter-PM-Multisig",
+    "deploy:hmn_mainnet": "npm run build && npx hardhat deploy --network harmony_mainnet_shard0",
     "deploy:hmn_testnet": "npm run build && npx hardhat deploy --network harmony_testnet_shard0",
     "deploy:bsc_testnet": "npm run build && npx hardhat deploy --network bsc_testnet"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-truffle5": "^2.0.2",
     "@nomiclabs/hardhat-web3": "^2.0.0",
+    "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@openzeppelin/test-helpers": "^0.5.15",
     "chai-bn": "^0.3.0",
     "eth-sig-util": "^3.0.1",

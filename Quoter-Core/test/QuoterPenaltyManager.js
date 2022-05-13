@@ -22,13 +22,21 @@ contract(
 
     beforeEach(async function () {
       this.quoterToken = await TokenMock.new("Quoter Token", "QTR");
-      this.quoterPM = await QuoterPenaltyManager.new(this.quoterToken.address, 25, { from: ownerWallet });
+      this.quoterPM = await QuoterPenaltyManager.new(this.quoterToken.address, 25, ownerWallet, { from: ownerWallet });
 
       await this.quoterToken.mint(makerWallet1, "1000");
       await this.quoterToken.mint(makerWallet2, "1000");
 
       await this.quoterToken.approve(this.quoterPM.address, "500", { from: makerWallet1 });
       await this.quoterToken.approve(this.quoterPM.address, "500", { from: makerWallet2 });
+    });
+
+    describe("QUOTER-PM owner", async function () {
+      it("mutableOwner should return owner of the smart contract", async function () {
+        const owner = await this.quoterPM.mutableOwner();
+
+        expect(owner).to.be.equal(ownerWallet);
+      });
     });
 
     describe("QUOTER-PM balance", async function () {

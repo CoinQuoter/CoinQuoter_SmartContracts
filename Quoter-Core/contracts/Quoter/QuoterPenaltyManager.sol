@@ -12,7 +12,7 @@ import "./interfaces/IPenaltyManager.sol";
 
 // @title Quoter Penalty Manager v1
 contract QuoterPenaltyManager is 
-    MutableOwner(msg.sender), 
+    MutableOwner, 
     SplitBonus,
     ReentrancyGuard, 
     IPenaltyManager 
@@ -35,7 +35,11 @@ contract QuoterPenaltyManager is
         _;
     }
 
-    constructor(address quoterAddress, uint256 splitBonus) SplitBonus(splitBonus, 100) {
+    constructor(
+        address quoterAddress, 
+        uint256 splitBonus, 
+        address owner
+    ) MutableOwner(owner) SplitBonus(splitBonus, 100)  {
         require(quoterAddress != address(0), "QUOTER-PM: 0 Quoter address");
 
         _quoterToken = IERC20(quoterAddress);

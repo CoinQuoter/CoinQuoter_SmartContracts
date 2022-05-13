@@ -4,6 +4,10 @@ require('solidity-coverage')
 require('hardhat-gas-reporter');
 require('@nomiclabs/hardhat-truffle5');
 require('hardhat-deploy');
+require("dotenv").config();
+
+const safeProtocolAddress = process.env.GNOSIS_SAFE_PROTOCOL_ADDRESS;
+const safeTokenAddress = process.env.GNOSIS_SAFE_TOKEN_ADDRESS;
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
@@ -44,6 +48,10 @@ module.exports = {
       saveDeployments: true,
       tags: ["bsc_testnet"],
     },
+  },
+  namedAccounts: {
+    safeProtocol: safeProtocolAddress,
+    safeToken: safeTokenAddress
   },
   contractSizer: {
     alphaSort: true,
