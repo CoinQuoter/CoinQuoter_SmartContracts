@@ -1,2 +1,0 @@
-# LLDEX
-Low Lattency DEX

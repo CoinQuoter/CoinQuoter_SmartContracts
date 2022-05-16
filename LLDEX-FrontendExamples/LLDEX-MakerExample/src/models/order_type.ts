@@ -1,1 +1,0 @@
-export enum OrderType { bid = 1, ask = 2 };
