@@ -20,8 +20,8 @@ contract QuoterPenaltyManager is
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    // Quoter token
-    IERC20 private _quoterToken;
+    // Penalty token
+    IERC20 private _penaltyToken;
 
     // Mapping of balance owner (maker, admin) to amount
     mapping(address => uint256) private _balances;
@@ -42,13 +42,13 @@ contract QuoterPenaltyManager is
     ) MutableOwner(owner) SplitBonus(splitBonus, 100)  {
         require(quoterAddress != address(0), "QUOTER-PM: 0 Quoter address");
 
-        _quoterToken = IERC20(quoterAddress);
+        _penaltyToken = IERC20(quoterAddress);
     }
 
     function depositToken(uint256 amount) external override nonReentrant returns (uint256) {
         require(amount > 0, "QUOTER-PM: amount is 0");
 
-        _quoterToken.safeTransferFrom(msg.sender, address(this), amount);
+        _penaltyToken.safeTransferFrom(msg.sender, address(this), amount);
         _balances[msg.sender] += amount;
 
         emit TokenDeposited(msg.sender, amount, _balances[msg.sender]);
@@ -214,7 +214,7 @@ contract QuoterPenaltyManager is
         require(amount > 0, "QUOTER-PM: amount is 0");
         require(_balances[msg.sender] >= amount, "QUOTER-PM: insufficient balance");
 
-        _quoterToken.safeTransfer(to, amount);
+        _penaltyToken.safeTransfer(to, amount);
         _balances[msg.sender] -= amount;
     }
 }

@@ -26,9 +26,15 @@
     "coverage": "hardhat coverage",
     "build": "rm -rf deployments && rm -rf cache && rm -rf artifacts && npx hardhat compile",
     "deploy-multisig:hmn_mainnet": "npm run build && npx hardhat deploy --network harmony_mainnet_shard0 --tags Quoter-PM-Multisig",
+    "deploy-multisig:bsc_mainnet": "npm run build && npx hardhat deploy --network bsc_mainnet --tags Quoter-PM-Multisig",
     "deploy:hmn_mainnet": "npm run build && npx hardhat deploy --network harmony_mainnet_shard0",
     "deploy:hmn_testnet": "npm run build && npx hardhat deploy --network harmony_testnet_shard0",
-    "deploy:bsc_testnet": "npm run build && npx hardhat deploy --network bsc_testnet"
+    "deploy:optimism_mainnet": "npm run build && npx hardhat deploy --network optimism_mainnet --tags Quoter-PM-USDT --gasprice 1000000",
+    "deploy:avalanche_mainnet": "npm run build && npx hardhat deploy --network avalanche_mainnet --tags Quoter-PM-USDT",
+    "deploy:arbitrum_mainnet": "npm run build && npx hardhat deploy --network arbitrum_mainnet --tags Quoter-PM-USDT",
+    "deploy:polygon_mainnet": "npm run build && npx hardhat deploy --network polygon_mainnet --tags Quoter-PM-USDT --gasprice 35000000000",
+    "deploy:harmony_mainnet": "npm run build && npx hardhat deploy --network harmony_mainnet_shard0 --tags Quoter-PM-USDT --gasprice 30000000000",
+    "deploy:bsc_mainnet": "npm run build && npx hardhat deploy --network bsc_mainnet --tags Quoter-PM-USDT"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-truffle5": "^2.0.2",

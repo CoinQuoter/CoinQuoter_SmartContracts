@@ -48,10 +48,46 @@ module.exports = {
       saveDeployments: true,
       tags: ["bsc_testnet"],
     },
+    bsc_mainnet: {
+      url: "https://bsc-dataseed.binance.org/",
+      chainId: 56,
+      saveDeployments: true,
+      tags: ["bsc_mainnet"],
+    },
+    bsc_mainnet: {
+      url: "https://bsc-dataseed.binance.org/",
+      chainId: 56,
+      saveDeployments: true,
+      tags: ["bsc_mainnet"],
+    },
+    optimism_mainnet: {
+      url: "https://mainnet.optimism.io",
+      chainId: 10,
+      saveDeployments: true,
+      tags: ["optimism_mainnet"],
+    },
+    avalanche_mainnet: {
+      url: "https://api.avax.network/ext/bc/C/rpc",
+      chainId: 43114,
+      saveDeployments: true,
+      tags: ["avalanche_mainnet"],
+    },
+    arbitrum_mainnet: {
+      url: "https://speedy-nodes-nyc.moralis.io/23b68a5d032ce216708dfcd5/arbitrum/mainnet",
+      chainId: 42161,
+      saveDeployments: true,
+      tags: ["arbitrum_mainnet"],
+    },
+    polygon_mainnet: {
+      url: "https://polygon-rpc.com",
+      chainId: 137,
+      saveDeployments: true,
+      tags: ["polygon_mainnet"],
+    },
   },
   namedAccounts: {
     safeProtocol: safeProtocolAddress,
-    safeToken: safeTokenAddress
+    safeToken: safeTokenAddress,
   },
   contractSizer: {
     alphaSort: true,

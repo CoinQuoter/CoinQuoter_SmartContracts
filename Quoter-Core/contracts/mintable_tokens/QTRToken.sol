@@ -6,7 +6,7 @@ contract QuoterToken is ERC20 {
     uint8 private _decimals;
 
     constructor(address mintTo) ERC20("Quoter Token", "QTR") {
-        _mint(mintTo, 5000000000000000000000000000000000);
+        _mint(mintTo, 777000000000000000000000000);
         _decimals = 18;
     }
 

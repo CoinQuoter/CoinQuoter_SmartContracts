@@ -23,6 +23,10 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     log: true,
   });
 
-  await deployQuoterToken(deployments, safeToken);
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  //await deployQuoterToken(deployments, safeToken);
+
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 };
 module.exports.tags = ["Quoter-Core-Multisig"];

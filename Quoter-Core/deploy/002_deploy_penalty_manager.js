@@ -15,12 +15,12 @@ module.exports = async ({ getNamedAccounts, ethers, deployments }) => {
     log: true,
   });
 
-  await execute(
-    "QuoterPenaltyManager",
-    { from: privateKey, log: true },
-    "addCollector",
-    defaultCollector,
-  );
+  // await execute(
+  //   "QuoterPenaltyManager",
+  //   { from: privateKey, log: true },
+  //   "addCollector",
+  //   defaultCollector,
+  // );
 };
 module.exports.tags = ["Quoter-PM"];
 module.exports.dependencies = ["Quoter-Core"];
