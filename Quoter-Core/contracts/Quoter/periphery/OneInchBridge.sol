@@ -11,15 +11,22 @@ import "./interfaces/ILendingPool.sol";
 import "./interfaces/IProtocolDataProvider.sol";
 import "./interfaces/IAggregationRouterV4.sol";
 
+import "./../libraries/UncheckedAddress.sol";
+import "./../helpers/MutableOwner.sol";
 import "./libraries/DataTypes.sol";
 
-contract OneInchBridge is ReentrancyGuard, IPeripheryCallback {
+contract OneInchBridge is 
+    ReentrancyGuard, 
+    IPeripheryCallback,
+    MutableOwner
+{
     using SafeERC20 for IERC20;
+    using UncheckedAddress for address;
 
     // Address of QouterProtocol contract
     address private quoterAddress;
 
-    // Address of 1Inch Aggregator OneSplitAudit contract
+    // Address of 1Inch Protocol v4 contract
     address private oneInchAggregatorAddress;
 
     // 1Inch aggregation protocol
@@ -32,21 +39,34 @@ contract OneInchBridge is ReentrancyGuard, IPeripheryCallback {
         _;
     }
 
-    constructor(address _quoterAddress, address _oneInchAggregatorAddress) {
+    constructor(address _quoterAddress, address _oneInchAggregatorAddress, address owner) MutableOwner(owner) {
         quoterAddress = _quoterAddress;
         oneInchAggregatorAddress = _oneInchAggregatorAddress;
 
         oneInchProtocol = IAggregationRouterV4(oneInchAggregatorAddress);
     }
 
+    receive() external payable {}
+
+    fallback() external payable {}
+
+
     function quoterPeripheryCallback(
         address maker,
         IRFQOrder.OrderRFQCallbackInfo calldata info,
         bytes memory payload
     ) external override verifyCallback returns (bytes memory result) {
-        (bool success, bytes memory returnData) = oneInchAggregatorAddress.call(payload);
-        require(success, "1InchBridge: call failed");
+        IERC20 tokenERC20 = IERC20(info.makerAsset);
+        tokenERC20.safeTransferFrom(maker, address(this), info.makingAmount);
+        result = oneInchAggregatorAddress.uncheckedFunctionCall(payload, "1InchBridge: call failed");
 
-        result = returnData;
+        if (result.length > 0) {
+            require(abi.decode(result, (bool)), "1InchBridge: call bad result");
+        }
+    }
+
+    function approve(address token) external onlyOwner{
+        IERC20 tokenERC20 = IERC20(token);
+        tokenERC20.approve(oneInchAggregatorAddress, type(uint256).max);
     }
 }
