@@ -3,7 +3,7 @@ require("dotenv").config();
 const splitBonus = Number(process.env.QUOTER_PM_DEFAULT_BONUS);
 const defaultCollector = process.env.QUOTER_PM_DEFAULT_COLLECTOR;
 const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
-const deployerPublicKey = process.env.DEPLOYER_PUBLIC_KEY;
+const ownerPublicKey = process.env.OWNER_PUBLIC_KEY;
 
 module.exports = async ({ getNamedAccounts, ethers, deployments }) => {
   const { deploy, execute } = deployments;
@@ -11,7 +11,7 @@ module.exports = async ({ getNamedAccounts, ethers, deployments }) => {
   const quoterTokenAddress = (await deployments.get("QuoterToken")).address
   await deploy("QuoterPenaltyManager", {
     from: privateKey,
-    args: [quoterTokenAddress, splitBonus, deployerPublicKey],
+    args: [quoterTokenAddress, splitBonus, ownerPublicKey],
     log: true,
   });
 

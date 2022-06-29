@@ -2,14 +2,14 @@ require("dotenv").config();
 
 const splitBonus = Number(process.env.QUOTER_DEFAULT_BONUS);
 const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
-const deployerPublicKey = process.env.DEPLOYER_PUBLIC_KEY;
+const ownerPublicKey = process.env.OWNER_PUBLIC_KEY;
 
 async function deployQuoterToken(deployments) {
   const { deploy, execute } = deployments;
 
   await deploy("QuoterToken", {
     from: privateKey,
-    args: [deployerPublicKey],
+    args: [ownerPublicKey],
     log: true,
   });
 }
@@ -19,7 +19,7 @@ module.exports = async ({getNamedAccounts, deployments}) => {
 
   await deploy("QuoterProtocol", {
     from: privateKey,
-    args: [splitBonus, deployerPublicKey],
+    args: [splitBonus, ownerPublicKey],
     log: true,
   });
 

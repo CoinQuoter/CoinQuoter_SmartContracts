@@ -8,8 +8,8 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
   await deploy("ZeroExBridge", {
     from: privateKey,
     args: [
-      "0x3b18110BB9142263C1b7A49A94C4433336bF0D8a",
-      "0xdef1c0ded9bec7f1a1670819833240f027b25eff",
+      "0x76540F7e38dFCdF3b39A501Bb7ef77c3705f4F17",
+      "0xDef1C0ded9bec7F1a1670819833240f027b25EfF",
       "0xA4CcEF1A4f039346DD72115a958712A65BF2f155",
     ],
     log: true,

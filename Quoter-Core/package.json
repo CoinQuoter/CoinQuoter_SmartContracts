@@ -35,7 +35,14 @@
     "deploy:polygon_mainnet": "npm run build && npx hardhat deploy --network polygon_mainnet --tags Quoter-PM-USDT --gasprice 35000000000",
     "deploy:harmony_mainnet": "npm run build && npx hardhat deploy --network harmony_mainnet_shard0 --tags Quoter-PM-USDT --gasprice 30000000000",
     "deploy:bsc_mainnet": "npm run build && npx hardhat deploy --network bsc_mainnet --tags Quoter-PM-USDT",
-    "deploy-bridge-zx:polygon_mainnet": "npm run build && npx hardhat deploy --network polygon_mainnet --tags ZeroEx-Bridge --gasprice 60000000000"
+    "deploy-bridge-zx:polygon_mainnet": "npm run build && npx hardhat deploy --network polygon_mainnet --tags ZeroEx-Bridge --gasprice 60000000000",
+    "deploy-bridge-zx:bsc_mainnet": "npm run build && npx hardhat deploy --network bsc_mainnet --tags ZeroEx-Bridge",
+    "deploy-bridge-zx:avalanche_mainnet": "npm run build && npx hardhat deploy --network avalanche_mainnet --tags ZeroEx-Bridge",
+    "deploy-bridge-zx:optimism_mainnet": "npm run build && npx hardhat deploy --network optimism_mainnet --tags ZeroEx-Bridge --gasprice 2000000",
+    "deploy-core-router:polygon_mainnet": "npm run build && npx hardhat deploy --network polygon_mainnet --tags Core-Router-Polygon  --gasprice 40000000000",
+    "deploy-core-router:avalanche_mainnet": "npm run build && npx hardhat deploy --network avalanche_mainnet --tags Core-Router-Avalanche --gasprice 25000000000",
+    "deploy-core-router:optimism_mainnet": "npm run build && npx hardhat deploy --network optimism_mainnet --tags Core-Router-Optimism",
+    "deploy-core-router:bsc_mainnet": "npm run build && npx hardhat deploy --network bsc_mainnet --tags Core-Router-BSC"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-truffle5": "^2.0.2",

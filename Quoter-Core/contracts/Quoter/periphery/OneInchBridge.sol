@@ -46,11 +46,6 @@ contract OneInchBridge is
         oneInchProtocol = IAggregationRouterV4(oneInchAggregatorAddress);
     }
 
-    receive() external payable {}
-
-    fallback() external payable {}
-
-
     function quoterPeripheryCallback(
         address maker,
         IRFQOrder.OrderRFQCallbackInfo calldata info,

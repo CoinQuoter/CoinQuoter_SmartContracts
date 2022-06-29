@@ -8,17 +8,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 import ".././interfaces/IPeripheryCallback.sol";
-import "./interfaces/ILendingPool.sol";
-import "./interfaces/IProtocolDataProvider.sol";
-import "./interfaces/IAggregationRouterV4.sol";
-
-import "./../helpers/MutableOwner.sol";
-import "./libraries/DataTypes.sol";
+import "./../helpers/ImmutableOwner.sol";
 
 contract ZeroExBridge is 
     ReentrancyGuard, 
     IPeripheryCallback,
-    MutableOwner
+    ImmutableOwner
 {
     using SafeERC20 for IERC20;
     using Address for address;
@@ -36,7 +31,7 @@ contract ZeroExBridge is
         _;
     }
 
-    constructor(address _quoterAddress, address _zeroExProxyAddress, address owner) MutableOwner(owner) {
+    constructor(address _quoterAddress, address _zeroExProxyAddress, address owner) ImmutableOwner(owner) {
         quoterAddress = _quoterAddress;
         zeroExProxyAddress = _zeroExProxyAddress;
     }
@@ -68,5 +63,11 @@ contract ZeroExBridge is
         sellToken.safeTransferFrom(maker, address(this), amount);
         result = zeroExProxyAddress.functionCall(zxPayload);
         buyToken.safeTransfer(maker, buyToken.balanceOf(address(this)));
+    }
+    
+    function emergencyTransfer(address _token) external onlyImmutableOwner {
+        IERC20 token = IERC20(_token);
+
+        token.safeTransfer(immutableOwner, token.balanceOf(address(this)));
     }
 }
